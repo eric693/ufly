@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { MapPin, Package, Zap, Clock, Truck, Star, Wifi, WifiOff, ChevronRight } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { MapPin, Package, Zap, Clock, Truck, Star, Wifi, WifiOff, ChevronRight, TrendingUp } from 'lucide-react'
 import api from '../../lib/api'
 import { getSocket } from '../../lib/socket'
 
@@ -53,15 +53,20 @@ export default function DriverQueue() {
               <h1 className="text-2xl font-black text-white">Ufly 司機端</h1>
               <p className="text-white/50 text-sm">接單系統</p>
             </div>
-            <button
-              onClick={toggleOnline}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm transition-all ${
-                online ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/60'
-              }`}
-            >
-              {online ? <Wifi size={16} /> : <WifiOff size={16} />}
-              {online ? '上線中' : '已下線'}
-            </button>
+            <div className="flex items-center gap-2">
+              <Link to="/driver/earnings" className="flex items-center gap-1 px-3 py-2 rounded-2xl bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors">
+                <TrendingUp size={14} /> 收益
+              </Link>
+              <button
+                onClick={toggleOnline}
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm transition-all ${
+                  online ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/60'
+                }`}
+              >
+                {online ? <Wifi size={16} /> : <WifiOff size={16} />}
+                {online ? '上線中' : '已下線'}
+              </button>
+            </div>
           </div>
           <div className="bg-white/10 rounded-2xl px-4 py-3 flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-400 animate-pulse' : 'bg-white/30'}`} />

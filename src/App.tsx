@@ -15,6 +15,7 @@ import AuthCallback from './pages/AuthCallback'
 import DriverQueue from './pages/driver/DriverQueue'
 import DriverOrderDetail from './pages/driver/DriverOrderDetail'
 import DriverLogin from './pages/driver/DriverLogin'
+import DriverEarnings from './pages/driver/DriverEarnings'
 import { AdminRoute, DriverRoute } from './components/ProtectedRoute'
 
 import Dashboard from './pages/admin/Dashboard'
@@ -45,6 +46,7 @@ export default function App() {
         <Route element={<DriverRoute />}>
           <Route path="/driver"            element={<DriverQueue />} />
           <Route path="/driver/order/:id"  element={<DriverOrderDetail />} />
+          <Route path="/driver/earnings"   element={<DriverEarnings />} />
         </Route>
 
         <Route element={<AdminRoute />}>

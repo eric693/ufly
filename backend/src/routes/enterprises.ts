@@ -56,4 +56,38 @@ router.get('/', requireAdmin, async (_req, res) => {
   res.json(rows.map(({ _count, ...e }) => ({ ...e, member_count: _count.members })))
 })
 
+// Monthly billing report for an enterprise
+router.get('/:id/billing', requireAdmin, async (req, res) => {
+  const ent = await prisma.enterprise.findUnique({ where: { id: req.params.id } })
+  if (!ent) { res.status(404).json({ error: '企業不存在' }); return }
+
+  const year  = parseInt(req.query.year  as string) || new Date().getFullYear()
+  const month = parseInt(req.query.month as string) || new Date().getMonth() + 1
+
+  const from = new Date(year, month - 1, 1)
+  const to   = new Date(year, month, 1)
+
+  const orders = await prisma.order.findMany({
+    where: { enterpriseId: req.params.id, createdAt: { gte: from, lt: to } },
+    include: { user: { select: { name: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const total = orders.reduce((s, o) => s + o.totalFee, 0)
+  const completed = orders.filter(o => o.status === 'completed').length
+
+  res.json({
+    enterprise: { id: ent.id, name: ent.name, taxId: ent.taxId, billingAddress: ent.billingAddress, contactEmail: ent.contactEmail },
+    period: { year, month },
+    order_count: orders.length,
+    completed_count: completed,
+    total_amount: total,
+    orders: orders.map(o => ({
+      id: o.id, status: o.status, user_name: o.user.name,
+      pickup_address: o.pickupAddress, delivery_address: o.deliveryAddress,
+      total_fee: o.totalFee, created_at: o.createdAt,
+    })),
+  })
+})
+
 export default router

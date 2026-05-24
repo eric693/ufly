@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, Phone, Package, ChevronRight, ArrowLeft, CheckCircle } from 'lucide-react'
+import { MapPin, Phone, Package, ChevronRight, ArrowLeft, CheckCircle, Camera, Loader2 } from 'lucide-react'
 import api from '../../lib/api'
 import { getSocket } from '../../lib/socket'
 
@@ -23,6 +23,9 @@ export default function DriverOrderDetail() {
   const [order, setOrder]     = useState<any>(null)
   const [updating, setUpdating] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get('/drivers/me/current')
@@ -59,6 +62,17 @@ export default function DriverOrderDetail() {
     } finally {
       setUpdating(false)
     }
+  }
+
+  const uploadPhoto = async (file: File) => {
+    if (!order) return
+    setUploading(true)
+    try {
+      const form = new FormData(); form.append('photo', file)
+      const { data } = await api.post(`/upload/proof/${order.id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setPhotoUrl(data.photo_url)
+    } catch { alert('上傳失敗，請重試') }
+    finally { setUploading(false) }
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-paper-400">載入中…</div>
@@ -139,6 +153,23 @@ export default function DriverOrderDetail() {
           <span className="text-paper-500 text-sm">本單收入</span>
           <span className="font-black text-xl text-paper-900">NT${order.total_fee}</span>
         </div>
+
+        {/* Photo upload (delivering → completed) */}
+        {order.status === 'delivering' && (
+          <div>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
+            {photoUrl || order.photo_url ? (
+              <img src={photoUrl || order.photo_url} alt="送達照片" className="w-full rounded-2xl mb-3 max-h-48 object-cover" />
+            ) : (
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-paper-300 rounded-2xl py-4 text-paper-500 hover:border-paper-400 hover:text-paper-700 transition-colors mb-3">
+                {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                {uploading ? '上傳中…' : '拍攝送達照片（選填）'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Action button */}
         {NEXT_ACTION[order.status] && (

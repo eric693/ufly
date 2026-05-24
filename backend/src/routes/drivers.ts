@@ -115,4 +115,35 @@ router.patch('/orders/:id/status', requireDriver, async (req: AuthRequest, res) 
   res.json(flatOrder(updated))
 })
 
+// Driver's own earnings summary
+router.get('/me/earnings', requireDriver, async (req: AuthRequest, res) => {
+  const driverId = req.user!.id
+  const orders = await prisma.order.findMany({
+    where: { driverId, status: 'completed' },
+    select: { id: true, totalFee: true, createdAt: true, serviceType: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  const gross = orders.reduce((s, o) => s + o.totalFee, 0)
+  const driverShare = Math.round(gross * 0.8)
+
+  // Last 7 days breakdown
+  const byDay: Record<string, number> = {}
+  for (const o of orders) {
+    const key = o.createdAt.toISOString().slice(0, 10)
+    byDay[key] = (byDay[key] || 0) + Math.round(o.totalFee * 0.8)
+  }
+
+  const ratings = await prisma.rating.aggregate({ where: { driverId }, _avg: { score: true }, _count: { id: true } })
+
+  res.json({
+    total_orders: orders.length,
+    gross,
+    driver_share: driverShare,
+    avg_rating: ratings._avg.score ?? 5.0,
+    rating_count: ratings._count.id,
+    by_day: byDay,
+    recent: orders.slice(0, 10),
+  })
+})
+
 export default router

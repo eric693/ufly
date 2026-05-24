@@ -5,6 +5,8 @@ import prisma from '../lib/prisma'
 import { requireAuth, AuthRequest } from '../middleware/requireAuth'
 import { serializeOrder, serializeRecurring } from '../lib/serializer'
 import { getFeeConfig } from '../lib/settings'
+import { calcDistance } from '../lib/maps'
+import { sendEmail, orderStatusEmail } from '../lib/email'
 
 const router = Router()
 
@@ -107,7 +109,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   if (item_content && typeof item_content === 'string' && item_content.length > 500) { res.status(400).json({ error: '物品說明過長（上限 500 字）' }); return }
   if (scheduled_at && new Date(scheduled_at) <= new Date()) { res.status(400).json({ error: '排程時間必須在未來' }); return }
 
-  const distance = estimateDistance()
+  const distance = await calcDistance(pickup_address, delivery_address)
 
   // Atomic promo consume
   const promo = promo_code ? await consumePromo(promo_code) : { discount: 0, id: null }
@@ -139,6 +141,11 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   })
 
   await notify(req.user!.id, 'info', '訂單已建立', `${id} — 正在媒合任務夥伴`)
+
+  // Email confirmation (non-blocking)
+  prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true } }).then(u => {
+    if (u?.email) sendEmail(u.email, `【Ufly】訂單已建立 ${id}`, orderStatusEmail(id, 'accepted')).catch(() => {})
+  }).catch(() => {})
 
   const io: Server | null = req.app.get('io')
   if (io) {

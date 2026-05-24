@@ -7,12 +7,15 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 
+import path from 'path'
 import authRouter        from './routes/auth'
 import usersRouter       from './routes/users'
 import ordersRouter      from './routes/orders'
 import enterprisesRouter from './routes/enterprises'
 import adminRouter       from './routes/admin'
 import driversRouter     from './routes/drivers'
+import uploadRouter      from './routes/upload'
+import paymentsRouter    from './routes/payments'
 import { setupSocketIO } from './socket'
 import prisma from './lib/prisma'
 import { serializeOrder } from './lib/serializer'
@@ -74,6 +77,12 @@ app.use('/api/orders',      ordersRouter)
 app.use('/api/enterprises', enterprisesRouter)
 app.use('/api/admin',       adminRouter)
 app.use('/api/drivers',     driversRouter)
+app.use('/api/upload',      uploadRouter)
+app.use('/api/payments',    paymentsRouter)
+
+// Serve uploaded files
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
+app.use('/uploads', express.static(UPLOAD_DIR))
 
 // ── Health check (includes DB ping) ──────────────────────────────────────────
 app.get('/api/health', async (_req, res) => {
@@ -114,6 +123,50 @@ setInterval(async () => {
     console.error('[scheduler] Error dispatching scheduled orders:', e)
   }
 }, 60_000)
+
+// ── Auto-dispatch: assign nearest online driver to matching orders ─────────────
+setInterval(async () => {
+  try {
+    const matching = await prisma.order.findMany({
+      where: { status: 'matching', driverId: null },
+    })
+    for (const order of matching) {
+      const drivers = await prisma.driver.findMany({
+        where: { status: 'online' },
+        select: { id: true, lat: true, lng: true },
+      })
+      if (drivers.length === 0) continue
+
+      // Pick driver with lat/lng closest to Taipei centre (rough heuristic when pickup coords unknown)
+      const TAIPEI_LAT = 25.033, TAIPEI_LNG = 121.565
+      drivers.sort((a, b) => {
+        const da = Math.hypot(a.lat - TAIPEI_LAT, a.lng - TAIPEI_LNG)
+        const db = Math.hypot(b.lat - TAIPEI_LAT, b.lng - TAIPEI_LNG)
+        return da - db
+      })
+      const chosen = drivers[0]
+
+      const result = await prisma.order.updateMany({
+        where: { id: order.id, status: 'matching' },
+        data: { status: 'accepted', driverId: chosen.id },
+      })
+      if (result.count === 0) continue // already taken
+
+      await prisma.driver.update({ where: { id: chosen.id }, data: { status: 'busy' } })
+      await prisma.notification.create({
+        data: { id: require('crypto').randomUUID(), userId: order.userId, type: 'info', title: '訂單已接單', body: `${order.id} — 已自動指派任務夥伴` },
+      })
+      const updated = await prisma.order.findUnique({ where: { id: order.id }, include: { driver: true } })
+      if (updated) {
+        io.to(`user:${order.userId}`).emit('order:update', serializeOrder(updated))
+        io.to(`driver:${chosen.id}`).emit('order:assigned', serializeOrder(updated))
+      }
+      console.log(`[auto-dispatch] Order ${order.id} → driver ${chosen.id}`)
+    }
+  } catch (e) {
+    console.error('[auto-dispatch] Error:', e)
+  }
+}, 30_000)
 
 // ── Recurring order processor: every 60s ─────────────────────────────────────
 setInterval(async () => {

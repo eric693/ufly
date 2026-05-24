@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import prisma from '../lib/prisma'
-import { requireAdmin } from '../middleware/requireAuth'
+import { requireAdmin, AuthRequest } from '../middleware/requireAuth'
 import { serializeOrder, serializeDriver, serializeUser } from '../lib/serializer'
 import { sendLineMessage } from '../lib/lineMessaging'
 import { readSettings, writeSettings } from '../lib/settings'
+import { sendEmail, orderStatusEmail } from '../lib/email'
+import { auditLog } from '../lib/audit'
 
 const router = Router()
 
@@ -44,7 +46,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
   res.json({ orders: orders.map(serializeOrder), total, page, limit })
 })
 
-router.put('/orders/:id/status', requireAdmin, async (req, res) => {
+router.put('/orders/:id/status', requireAdmin, async (req: AuthRequest, res) => {
   const { status, driver_id } = req.body
   const valid = ['pending', 'matching', 'accepted', 'pickup', 'delivering', 'completed', 'cancelled']
   if (!valid.includes(status)) { res.status(400).json({ error: 'Invalid status' }); return }
@@ -52,14 +54,16 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     where: { id: req.params.id },
     data: { status, ...(driver_id ? { driverId: driver_id } : {}) },
   })
+  auditLog('order:status', req, req.params.id, status, req.user?.id)
   if (order.userId) {
     const msgs: Record<string, string> = { accepted: '已接單', pickup: '取件中', delivering: '配送中', completed: '已送達', cancelled: '已取消' }
     if (msgs[status]) {
       const title = `訂單${msgs[status]}`
       const body = `${order.id} — ${msgs[status]}`
       await prisma.notification.create({ data: { id: uuidv4(), userId: order.userId, type: status === 'completed' ? 'success' : 'info', title, body } })
-      const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { lineId: true } })
+      const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { lineId: true, email: true } })
       if (user?.lineId) await sendLineMessage(user.lineId, `【Ufly】${title}\n${body}`)
+      if (user?.email) sendEmail(user.email, `【Ufly】${title}`, orderStatusEmail(order.id, status)).catch(() => {})
     }
   }
   res.json({ ok: true })
@@ -76,12 +80,13 @@ router.get('/drivers', requireAdmin, async (_req, res) => {
   res.json(drivers.map(serializeDriver))
 })
 
-router.post('/drivers', requireAdmin, async (req, res) => {
+router.post('/drivers', requireAdmin, async (req: AuthRequest, res) => {
   const { name, phone, area, email } = req.body
   if (!name) { res.status(400).json({ error: '請填寫姓名' }); return }
   const driver = await prisma.driver.create({
     data: { id: uuidv4(), name, phone: phone || null, area: area || null, email: email || null, status: 'offline' },
   })
+  auditLog('driver:create', req, driver.id, name, req.user?.id)
   res.json(serializeDriver(driver))
 })
 
@@ -104,8 +109,9 @@ router.put('/drivers/:id/status', requireAdmin, async (req, res) => {
   res.json({ ok: true })
 })
 
-router.delete('/drivers/:id', requireAdmin, async (req, res) => {
+router.delete('/drivers/:id', requireAdmin, async (req: AuthRequest, res) => {
   await prisma.driver.delete({ where: { id: req.params.id } })
+  auditLog('driver:delete', req, req.params.id, undefined, req.user?.id)
   res.json({ ok: true })
 })
 
@@ -211,6 +217,26 @@ router.delete('/promos/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true })
 })
 
+router.get('/audit-logs', requireAdmin, async (req, res) => {
+  const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 50), 200)
+  const offset = Math.max(0, parseInt(req.query.offset as string) || 0)
+  const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit, skip: offset })
+  res.json(logs)
+})
+
+router.get('/drivers/:id/earnings', requireAdmin, async (req, res) => {
+  const driver = await prisma.driver.findUnique({ where: { id: req.params.id } })
+  if (!driver) { res.status(404).json({ error: '司機不存在' }); return }
+  const orders = await prisma.order.findMany({
+    where: { driverId: req.params.id, status: 'completed' },
+    select: { id: true, totalFee: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  const total = orders.reduce((s, o) => s + o.totalFee, 0)
+  const driverShare = Math.round(total * 0.8) // 80% to driver
+  res.json({ driver_id: req.params.id, name: driver.name, total_orders: orders.length, gross: total, driver_share: driverShare, orders })
+})
+
 router.get('/settings', requireAdmin, (_req, res) => {
   res.json(readSettings())
 })
@@ -221,11 +247,12 @@ const ALLOWED_SETTING_KEYS = new Set([
   'maxOrderDistance','autoMatchRadius',
 ])
 
-router.put('/settings', requireAdmin, (req, res) => {
+router.put('/settings', requireAdmin, (req: AuthRequest, res) => {
   try {
     const safe = Object.fromEntries(
       Object.entries(req.body).filter(([k]) => ALLOWED_SETTING_KEYS.has(k))
     )
+    auditLog('settings:update', req, undefined, JSON.stringify(safe), req.user?.id)
     res.json(writeSettings(safe))
   } catch { res.status(500).json({ error: 'Failed to save settings' }) }
 })

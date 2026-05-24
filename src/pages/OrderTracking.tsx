@@ -4,9 +4,20 @@ import {
   MapPin, Phone, Clock, CheckCircle, Circle, Package,
   Navigation, Star, MessageCircle, AlertCircle, Loader2, X,
 } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
 import { getSocket } from '../lib/socket'
 import type { OrderStatus } from '../types'
+
+// Fix default leaflet marker icon paths broken by Vite bundling
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 const STATUS_STEPS: { status: OrderStatus; label: string }[] = [
   { status: 'pending',    label: '等待媒合' },
@@ -33,8 +44,12 @@ interface Order {
   pickup_address: string; delivery_address: string
   distance: number; duration: number; total_fee: number
   driver_name?: string; driver_phone?: string; driver_rating?: number
+  driver_id?: string
   created_at: string; rated: number; item_content: string
+  photo_url?: string
 }
+
+interface DriverPos { driverId: string; lat: number; lng: number }
 
 export default function OrderTracking() {
   const [params]                      = useSearchParams()
@@ -45,6 +60,7 @@ export default function OrderTracking() {
   const [loading, setLoading]         = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [msgToast, setMsgToast]       = useState(false)
+  const [driverPos, setDriverPos]     = useState<DriverPos | null>(null)
   const socketRef                     = useRef(getSocket())
 
   const fetchOrders = async () => {
@@ -64,7 +80,10 @@ export default function OrderTracking() {
         return exists ? prev.map(o => o.id === updated.id ? updated : o) : [updated, ...prev]
       })
     })
-    return () => { sock.off('order:update') }
+    sock.on('driver:locationUpdate', (pos: DriverPos) => {
+      setDriverPos(pos)
+    })
+    return () => { sock.off('order:update'); sock.off('driver:locationUpdate') }
   }, [])
 
   const cancelOrder = async (id: string) => {
@@ -226,6 +245,29 @@ export default function OrderTracking() {
                     <div className="text-paper-500 text-xs mt-0.5">預計 1–3 分鐘內完成媒合</div>
                   </div>
                   <Loader2 size={16} className="animate-spin text-paper-400 ml-auto" />
+                </div>
+              )}
+
+              {/* Live driver map */}
+              {order.driver_id && ['accepted','pickup','delivering'].includes(order.status) && driverPos && driverPos.driverId === order.driver_id && (
+                <div className="card p-0 overflow-hidden">
+                  <div className="px-4 pt-4 pb-2 text-paper-500 text-xs font-semibold uppercase tracking-wider">即時位置</div>
+                  <div style={{ height: 220 }}>
+                    <MapContainer center={[driverPos.lat, driverPos.lng]} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <Marker position={[driverPos.lat, driverPos.lng]}>
+                        <Popup>{order.driver_name || '任務夥伴'}</Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Proof photo */}
+              {order.photo_url && (
+                <div className="card">
+                  <div className="text-paper-500 text-xs font-semibold mb-3 uppercase tracking-wider">送達照片</div>
+                  <img src={order.photo_url} alt="送達照片" className="rounded-xl w-full object-cover max-h-56" />
                 </div>
               )}
 
