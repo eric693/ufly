@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
-import { requireAuth, AuthRequest } from '../middleware/requireAuth'
+import { requireDriver, AuthRequest } from '../middleware/requireAuth'
 import prisma from '../lib/prisma'
 
 const router = Router()
@@ -28,12 +28,13 @@ const upload = multer({
 })
 
 // POST /api/upload/proof/:orderId — driver uploads delivery proof photo
-router.post('/proof/:orderId', requireAuth, upload.single('photo'), async (req: AuthRequest, res) => {
+router.post('/proof/:orderId', requireDriver, upload.single('photo'), async (req: AuthRequest, res) => {
   if (!req.file) { res.status(400).json({ error: '請上傳圖片' }); return }
 
   const order = await prisma.order.findUnique({ where: { id: req.params.orderId } })
   if (!order) { res.status(404).json({ error: '訂單不存在' }); return }
   if (order.driverId !== req.user!.id) { res.status(403).json({ error: '無權限' }); return }
+  if (!['delivering', 'completed'].includes(order.status)) { res.status(400).json({ error: '只有配送中或已完成的訂單可上傳照片' }); return }
 
   const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4010}`
   const photoUrl = `${baseUrl}/uploads/${req.file.filename}`

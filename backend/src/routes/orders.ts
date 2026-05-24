@@ -115,9 +115,11 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   // Atomic promo consume
   const promo = promo_code ? await consumePromo(promo_code) : { discount: 0, id: null }
 
+  // Fetch user meta (referral + enterpriseId) in one query
+  const userMeta = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { referralBy: true, enterpriseId: true } })
+
   // Referral first-order discount (NT$50, only if user has never placed an order)
   const userOrderCount = await prisma.order.count({ where: { userId: req.user!.id } })
-  const userMeta = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { referralBy: true } })
   const referralDiscount = (userOrderCount === 0 && !!userMeta?.referralBy) ? 50 : 0
 
   const totalDiscount = promo.discount + referralDiscount
@@ -128,6 +130,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   const order = await prisma.order.create({
     data: {
       id, userId: req.user!.id,
+      enterpriseId: userMeta?.enterpriseId ?? null,
       serviceType: service_type || 'delivery',
       status: initialStatus,
       pickupAddress: pickup_address, pickupPhone: pickup_phone || null,

@@ -50,6 +50,8 @@ router.put('/orders/:id/status', requireAdmin, async (req: AuthRequest, res) => 
   const { status, driver_id } = req.body
   const valid = ['pending', 'matching', 'accepted', 'pickup', 'delivering', 'completed', 'cancelled']
   if (!valid.includes(status)) { res.status(400).json({ error: 'Invalid status' }); return }
+  const exists = await prisma.order.findUnique({ where: { id: req.params.id }, select: { id: true } })
+  if (!exists) { res.status(404).json({ error: '訂單不存在' }); return }
   const order = await prisma.order.update({
     where: { id: req.params.id },
     data: { status, ...(driver_id ? { driverId: driver_id } : {}) },
@@ -92,7 +94,7 @@ router.post('/drivers', requireAdmin, async (req: AuthRequest, res) => {
 
 router.put('/drivers/:id', requireAdmin, async (req, res) => {
   const { name, phone, area, email } = req.body
-  const driver = await prisma.driver.update({
+  const r = await prisma.driver.updateMany({
     where: { id: req.params.id },
     data: {
       ...(name ? { name } : {}),
@@ -101,7 +103,9 @@ router.put('/drivers/:id', requireAdmin, async (req, res) => {
       ...(email !== undefined ? { email: email || null } : {}),
     },
   })
-  res.json(serializeDriver(driver))
+  if (r.count === 0) { res.status(404).json({ error: '司機不存在' }); return }
+  const driver = await prisma.driver.findUnique({ where: { id: req.params.id } })
+  res.json(serializeDriver(driver!))
 })
 
 router.put('/drivers/:id/status', requireAdmin, async (req, res) => {
@@ -113,7 +117,10 @@ router.put('/drivers/:id/status', requireAdmin, async (req, res) => {
 })
 
 router.delete('/drivers/:id', requireAdmin, async (req: AuthRequest, res) => {
-  await prisma.driver.delete({ where: { id: req.params.id } })
+  // Null-out driverId on orders before deleting to satisfy FK constraint
+  await prisma.order.updateMany({ where: { driverId: req.params.id }, data: { driverId: null } })
+  const r = await prisma.driver.deleteMany({ where: { id: req.params.id } })
+  if (r.count === 0) { res.status(404).json({ error: '司機不存在' }); return }
   auditLog('driver:delete', req, req.params.id, undefined, req.user?.id)
   res.json({ ok: true })
 })
@@ -208,15 +215,18 @@ router.post('/promos', requireAdmin, async (req, res) => {
 
 router.put('/promos/:id', requireAdmin, async (req, res) => {
   const { active, usage_max } = req.body
-  const promo = await prisma.promoCode.update({
+  const r = await prisma.promoCode.updateMany({
     where: { id: req.params.id },
     data: { ...(active !== undefined ? { active } : {}), ...(usage_max !== undefined ? { usageMax: usage_max } : {}) },
   })
+  if (r.count === 0) { res.status(404).json({ error: '優惠碼不存在' }); return }
+  const promo = await prisma.promoCode.findUnique({ where: { id: req.params.id } })
   res.json(promo)
 })
 
 router.delete('/promos/:id', requireAdmin, async (req, res) => {
-  await prisma.promoCode.delete({ where: { id: req.params.id } })
+  const r = await prisma.promoCode.deleteMany({ where: { id: req.params.id } })
+  if (r.count === 0) { res.status(404).json({ error: '優惠碼不存在' }); return }
   res.json({ ok: true })
 })
 
