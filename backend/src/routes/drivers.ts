@@ -51,25 +51,27 @@ router.put('/me/status', requireDriver, async (req: AuthRequest, res) => {
   res.json({ ok: true })
 })
 
-// Accept an order
+// Accept an order — atomic to prevent double-acceptance race condition
 router.patch('/orders/:id/accept', requireDriver, async (req: AuthRequest, res) => {
-  const order = await prisma.order.findFirst({ where: { id: req.params.id, status: 'matching' } })
-  if (!order) { res.status(404).json({ error: '訂單不存在或已被接單' }); return }
-
-  const updated = await prisma.order.update({
-    where: { id: req.params.id },
-    data: { status: 'accepted', driverId: req.user!.id },
-    include: { driver: true },
+  // Single UPDATE with status guard — if another driver already accepted, count === 0
+  const result = await prisma.order.updateMany({
+    where: { id: req.params.id, status: 'matching' },
+    data:  { status: 'accepted', driverId: req.user!.id },
   })
+  if (result.count === 0) { res.status(409).json({ error: '訂單不存在或已被接單' }); return }
+
+  const updated = await prisma.order.findUnique({ where: { id: req.params.id }, include: { driver: true } })
+  if (!updated) { res.status(404).json({ error: 'Not found' }); return }
+
   await prisma.driver.update({ where: { id: req.user!.id }, data: { status: 'busy' } })
 
   const io: Server | null = req.app.get('io')
   if (io) {
-    io.to(`user:${order.userId}`).emit('order:update', flatOrder(updated))
+    io.to(`user:${updated.userId}`).emit('order:update', flatOrder(updated))
     io.to('admin').emit('order:update', flatOrder(updated))
   }
 
-  await notifyUser(order.userId, 'info', '已接單', `夥伴 ${updated.driver?.name || ''} 正在前往取件`, order.id)
+  await notifyUser(updated.userId, 'info', '已接單', `夥伴 ${updated.driver?.name || ''} 正在前往取件`, updated.id)
 
   res.json(flatOrder(updated))
 })

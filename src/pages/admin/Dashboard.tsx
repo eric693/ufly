@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   TrendingUp, Package, Navigation, Clock, CheckCircle,
-  AlertCircle, ChevronRight, ArrowUpRight, Zap, Loader2,
+  AlertCircle, ChevronRight, Zap, Loader2,
 } from 'lucide-react'
 import api from '../../lib/api'
 
@@ -20,8 +20,10 @@ export default function Dashboard() {
   const [recentOrders, setRecent]   = useState<any[]>([])
   const [drivers, setDrivers]       = useState<any[]>([])
   const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState('')
 
   useEffect(() => {
+    setError('')
     Promise.all([
       api.get('/admin/stats'),
       api.get('/admin/orders?limit=5'),
@@ -30,7 +32,8 @@ export default function Dashboard() {
       setStats(s.data)
       setRecent(o.data.orders || [])
       setDrivers((d.data || []).filter((x: any) => x.status !== 'offline').slice(0, 4))
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((e: any) => setError(e?.response?.data?.error || '載入失敗，請重試'))
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) return (
@@ -39,13 +42,19 @@ export default function Dashboard() {
     </div>
   )
 
+  if (error) return (
+    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+      <AlertCircle size={15} className="flex-shrink-0" /> {error}
+    </div>
+  )
+
   const STAT_CARDS = [
-    { label: '今日訂單',  value: stats?.todayOrders || 0,            unit: '筆',    change: '+12%', up: true,  icon: Package,      color: 'text-blue-400 bg-blue-400/10' },
-    { label: '今日營收',  value: `NT$${(stats?.todayRevenue || 0).toLocaleString()}`, unit: '', change: '+8%', up: true, icon: TrendingUp, color: 'text-white bg-white/8' },
-    { label: '在線夥伴',  value: stats?.activeDrivers || 0,           unit: '人',    change: '目前', up: true,  icon: Navigation,   color: 'text-purple-400 bg-purple-400/10' },
-    { label: '完成率',    value: stats?.completionRate || 0,          unit: '%',     change: '',    up: true,  icon: CheckCircle,  color: 'text-white bg-white/8' },
-    { label: '待處理',    value: stats?.pendingOrders || 0,           unit: '筆',    change: '需關注', up: false, icon: AlertCircle, color: 'text-yellow-400 bg-yellow-400/10' },
-    { label: '平均送達',  value: stats?.avgDeliveryTime || 0,        unit: '分鐘',  change: '',    up: true,  icon: Clock,        color: 'text-orange-400 bg-orange-400/10' },
+    { label: '今日訂單', value: stats?.todayOrders || 0,                                unit: '筆',   icon: Package,    color: 'text-blue-400 bg-blue-400/10' },
+    { label: '今日營收', value: `NT$${(stats?.todayRevenue || 0).toLocaleString()}`,    unit: '',     icon: TrendingUp, color: 'text-white bg-white/8' },
+    { label: '在線夥伴', value: stats?.activeDrivers || 0,                              unit: '人',   icon: Navigation, color: 'text-purple-400 bg-purple-400/10' },
+    { label: '完成率',   value: stats?.completionRate ?? 100,                           unit: '%',    icon: CheckCircle,color: 'text-white bg-white/8' },
+    { label: '待處理',   value: stats?.pendingOrders || 0,                              unit: '筆',   icon: AlertCircle,color: 'text-yellow-400 bg-yellow-400/10' },
+    { label: '平均送達', value: stats?.avgDeliveryTime || '—',                          unit: stats?.avgDeliveryTime ? '分鐘' : '', icon: Clock, color: 'text-orange-400 bg-orange-400/10' },
   ]
 
   return (
@@ -70,11 +79,6 @@ export default function Dashboard() {
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${c.color}`}>
                 <c.icon size={18} />
               </div>
-              {c.change && (
-                <div className={`flex items-center gap-1 text-xs font-medium ${c.up ? 'text-white' : 'text-yellow-400'}`}>
-                  {c.up && <ArrowUpRight size={12} />}{c.change}
-                </div>
-              )}
             </div>
             <div className="text-2xl font-black">{c.value}<span className="text-gray-400 text-base font-medium ml-1">{c.unit}</span></div>
             <div className="text-gray-400 text-sm mt-1">{c.label}</div>

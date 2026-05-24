@@ -1,51 +1,29 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import fs from 'fs'
-import path from 'path'
 import prisma from '../lib/prisma'
 import { requireAdmin } from '../middleware/requireAuth'
 import { serializeOrder, serializeDriver, serializeUser } from '../lib/serializer'
 import { sendLineMessage } from '../lib/lineMessaging'
-
-const SETTINGS_PATH = path.join(__dirname, '../../settings.json')
-const DEFAULT_SETTINGS = {
-  platformName: 'Ufly 城市任務平台',
-  serviceArea: '台北市（以中正區為主）',
-  baseFee: '120',
-  expressSurcharge: '30',
-  prioritySurcharge: '80',
-  urgentSurcharge: '150',
-  notifyNewOrder: true,
-  notifyDriverMatch: true,
-  notifyOrderComplete: true,
-  maxOrderDistance: '25',
-  autoMatchRadius: '5',
-}
-function readSettings() {
-  try {
-    return fs.existsSync(SETTINGS_PATH)
-      ? { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')) }
-      : DEFAULT_SETTINGS
-  } catch { return DEFAULT_SETTINGS }
-}
+import { readSettings, writeSettings } from '../lib/settings'
 
 const router = Router()
 
 router.get('/stats', requireAdmin, async (_req, res) => {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
 
-  const [todayOrders, todayRevenueAgg, activeDrivers, pendingOrders, totalCompleted, totalClosed] = await Promise.all([
+  const [todayOrders, todayRevenueAgg, activeDrivers, pendingOrders, totalCompleted, totalClosed, avgDurationAgg] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
     prisma.order.aggregate({ where: { status: 'completed', createdAt: { gte: startOfDay } }, _sum: { totalFee: true } }),
     prisma.driver.count({ where: { status: { not: 'offline' } } }),
     prisma.order.count({ where: { status: { in: ['pending', 'matching'] } } }),
     prisma.order.count({ where: { status: 'completed' } }),
     prisma.order.count({ where: { status: { in: ['completed', 'cancelled'] } } }),
+    prisma.order.aggregate({ where: { status: 'completed', duration: { gt: 0 } }, _avg: { duration: true } }),
   ])
 
-  // completionRate = completed / (completed + cancelled), excludes in-progress orders
   const completionRate = totalClosed > 0 ? Math.round((totalCompleted / totalClosed) * 1000) / 10 : 100
-  res.json({ todayOrders, todayRevenue: todayRevenueAgg._sum.totalFee ?? 0, activeDrivers, pendingOrders, completionRate, avgDeliveryTime: 38 })
+  const avgDeliveryTime = Math.round(avgDurationAgg._avg.duration ?? 0)
+  res.json({ todayOrders, todayRevenue: todayRevenueAgg._sum.totalFee ?? 0, activeDrivers, pendingOrders, completionRate, avgDeliveryTime })
 })
 
 router.get('/orders', requireAdmin, async (req, res) => {
@@ -237,9 +215,7 @@ router.get('/settings', requireAdmin, (_req, res) => {
 
 router.put('/settings', requireAdmin, (req, res) => {
   try {
-    const updated = { ...readSettings(), ...req.body }
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2))
-    res.json(updated)
+    res.json(writeSettings(req.body))
   } catch { res.status(500).json({ error: 'Failed to save settings' }) }
 })
 

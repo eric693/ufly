@@ -9,6 +9,9 @@ const router = Router()
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173'
 const API_URL  = process.env.API_URL      || 'http://localhost:3001'
 
+// CSRF state store: state → expiresAt (10 min TTL)
+const oauthStates = new Map<string, number>()
+
 function makeToken(payload: { id: string; name: string; role: string; email?: string | null; avatar?: string | null }) {
   return jwt.sign(
     { id: payload.id, name: payload.name, role: payload.role, email: payload.email, avatar: payload.avatar },
@@ -69,19 +72,25 @@ async function findOrCreateUser(params: {
 
 // GET /api/auth/google
 router.get('/google', (_req, res) => {
+  const state = uuidv4()
+  oauthStates.set(state, Date.now() + 10 * 60 * 1000)
   const params = new URLSearchParams({
     client_id:     process.env.GOOGLE_CLIENT_ID!,
     redirect_uri:  `${API_URL}/api/auth/google/callback`,
     response_type: 'code',
     scope:         'openid email profile',
     access_type:   'offline',
+    state,
   })
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
 })
 
 router.get('/google/callback', async (req, res) => {
-  const { code } = req.query
+  const { code, state } = req.query
   if (!code) { res.redirect(`${FRONTEND}/login?error=cancelled`); return }
+  const exp = oauthStates.get(state as string)
+  if (!exp || exp < Date.now()) { res.redirect(`${FRONTEND}/login?error=invalid_state`); return }
+  oauthStates.delete(state as string)
   try {
     const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
       code, grant_type: 'authorization_code',
@@ -109,19 +118,24 @@ router.get('/google/callback', async (req, res) => {
 
 // GET /api/auth/line
 router.get('/line', (_req, res) => {
+  const state = uuidv4()
+  oauthStates.set(state, Date.now() + 10 * 60 * 1000)
   const params = new URLSearchParams({
     response_type: 'code',
     client_id:     process.env.LINE_CHANNEL_ID!,
     redirect_uri:  `${API_URL}/api/auth/line/callback`,
-    state:         uuidv4(),
+    state,
     scope:         'profile openid email',
   })
   res.redirect(`https://access.line.me/oauth2/v2.1/authorize?${params}`)
 })
 
 router.get('/line/callback', async (req, res) => {
-  const { code } = req.query
+  const { code, state } = req.query
   if (!code) { res.redirect(`${FRONTEND}/login?error=cancelled`); return }
+  const exp = oauthStates.get(state as string)
+  if (!exp || exp < Date.now()) { res.redirect(`${FRONTEND}/login?error=invalid_state`); return }
+  oauthStates.delete(state as string)
   try {
     const { data: tokens } = await axios.post(
       'https://api.line.me/oauth2/v2.1/token',

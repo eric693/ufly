@@ -14,6 +14,7 @@ import driversRouter    from './routes/drivers'
 import { setupSocketIO } from './socket'
 import prisma from './lib/prisma'
 import { serializeOrder } from './lib/serializer'
+import { calcNextRun } from './routes/orders'
 
 const app    = express()
 const server = http.createServer(app)
@@ -73,6 +74,41 @@ setInterval(async () => {
   } catch (e) {
     console.error('[scheduler] Error dispatching scheduled orders:', e)
   }
+}, 60_000)
+
+// Recurring order processor: every 60s spawn orders whose nextRun is due
+setInterval(async () => {
+  try {
+    const due = await prisma.recurringOrder.findMany({
+      where: { active: true, nextRun: { lte: new Date() } },
+    })
+    for (const rec of due) {
+      // Build order id
+      const last = await prisma.order.findFirst({ where: { id: { startsWith: 'UF' } }, orderBy: { id: 'desc' } })
+      const newId = last
+        ? 'UF' + String(parseInt(last.id.replace('UF', '')) + 1).padStart(6, '0')
+        : 'UF240001'
+
+      const order = await prisma.order.create({
+        data: {
+          id: newId, userId: rec.userId,
+          serviceType: rec.serviceType, status: 'matching',
+          pickupAddress: rec.pickupAddress, deliveryAddress: rec.deliveryAddress,
+          itemContent: rec.itemContent, speedTier: rec.speedTier,
+          baseFee: 120, surcharge: 0, discount: 0, totalFee: 120,
+          distance: 0, duration: 0,
+          recurringId: rec.id,
+        },
+      })
+      await prisma.recurringOrder.update({
+        where: { id: rec.id },
+        data: { nextRun: calcNextRun(rec.schedule, new Date()) },
+      })
+      io.to('drivers').emit('order:new', serializeOrder(order))
+      io.to(`user:${rec.userId}`).emit('order:update', serializeOrder(order))
+      console.log(`[recurring] Spawned order ${newId} from template ${rec.id}`)
+    }
+  } catch (e) { console.error('[recurring] Error:', e) }
 }, 60_000)
 
 const PORT = process.env.PORT || 3001

@@ -4,19 +4,19 @@ import { v4 as uuidv4 } from 'uuid'
 import prisma from '../lib/prisma'
 import { requireAuth, AuthRequest } from '../middleware/requireAuth'
 import { serializeOrder, serializeRecurring } from '../lib/serializer'
+import { getFeeConfig } from '../lib/settings'
 
 const router = Router()
 
-const SPEED_SURCHARGE: Record<string, number> = { standard: 0, express: 30, priority: 80, urgent: 150 }
-const SPEED_MINUTES:   Record<string, number> = { standard: 75, express: 52, priority: 37, urgent: 20 }
-const BASE_FEE = 120
+const SPEED_MINUTES: Record<string, number> = { standard: 75, express: 52, priority: 37, urgent: 20 }
 const FEE_PER_KM = 12
 
 function estimateDistance() { return Math.round((4 + Math.random() * 14) * 10) / 10 }
 
 function calcFare(distance: number, speedTier: string, discount = 0) {
-  const base      = BASE_FEE + Math.round(distance * FEE_PER_KM)
-  const surcharge = SPEED_SURCHARGE[speedTier] ?? 0
+  const { baseFee, surcharges } = getFeeConfig()
+  const base      = baseFee + Math.round(distance * FEE_PER_KM)
+  const surcharge = (surcharges as Record<string, number>)[speedTier] ?? 0
   const total     = Math.max(0, base + surcharge - discount)
   const duration  = Math.round((SPEED_MINUTES[speedTier] ?? 75) * (0.8 + distance / 20))
   return { base_fee: base, surcharge, discount, total_fee: total, duration }
@@ -32,6 +32,29 @@ async function notify(userId: string, type: string, title: string, body: string)
   await prisma.notification.create({ data: { id: uuidv4(), userId, type, title, body } })
 }
 
+// Atomically validate + consume a promo code. Returns discount amount or 0.
+async function consumePromo(code: string): Promise<{ discount: number; id: string | null }> {
+  const rows = await prisma.$queryRaw<{ id: string; discount: number }[]>`
+    UPDATE promo_codes
+    SET usage_count = usage_count + 1
+    WHERE code = ${code.toUpperCase()} AND active = true
+      AND (usage_max IS NULL OR usage_count < usage_max)
+    RETURNING id, discount
+  `
+  return rows[0] ? { discount: rows[0].discount, id: rows[0].id } : { discount: 0, id: null }
+}
+
+// Peek at promo without consuming (for estimate)
+async function peekPromo(code: string): Promise<number> {
+  const promo = await prisma.promoCode.findFirst({
+    where: { code: code.toUpperCase(), active: true },
+    select: { discount: true, usageMax: true, usageCount: true },
+  })
+  if (!promo) return 0
+  if (promo.usageMax !== null && promo.usageCount >= promo.usageMax) return 0
+  return promo.discount
+}
+
 const flatOrder = serializeOrder
 
 // IMPORTANT: /recurring/* routes must come before /:id
@@ -43,8 +66,9 @@ router.get('/recurring/list', requireAuth, async (req: AuthRequest, res) => {
 router.post('/recurring', requireAuth, async (req: AuthRequest, res) => {
   const { service_type, pickup_address, delivery_address, item_content, speed_tier, schedule } = req.body
   if (!pickup_address || !delivery_address || !schedule) { res.status(400).json({ error: '缺少必要欄位' }); return }
+  const nextRun = calcNextRun(schedule, new Date())
   const row = await prisma.recurringOrder.create({
-    data: { id: uuidv4(), userId: req.user!.id, serviceType: service_type || 'delivery', pickupAddress: pickup_address, deliveryAddress: delivery_address, itemContent: item_content || null, speedTier: speed_tier || 'standard', schedule },
+    data: { id: uuidv4(), userId: req.user!.id, serviceType: service_type || 'delivery', pickupAddress: pickup_address, deliveryAddress: delivery_address, itemContent: item_content || null, speedTier: speed_tier || 'standard', schedule, nextRun },
   })
   res.json(serializeRecurring(row))
 })
@@ -57,11 +81,7 @@ router.delete('/recurring/:id', requireAuth, async (req: AuthRequest, res) => {
 router.post('/estimate', requireAuth, async (req: AuthRequest, res) => {
   const { speed_tier = 'standard', promo_code } = req.body
   const distance = estimateDistance()
-  let discount = 0
-  if (promo_code) {
-    const promo = await prisma.promoCode.findFirst({ where: { code: promo_code.toUpperCase(), active: true } })
-    if (promo && (!promo.usageMax || promo.usageCount < promo.usageMax)) discount = promo.discount
-  }
+  const discount = promo_code ? await peekPromo(promo_code) : 0
   res.json({ distance, ...calcFare(distance, speed_tier, discount), valid_promo: discount > 0 })
 })
 
@@ -82,15 +102,18 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   if (!pickup_address || !delivery_address) { res.status(400).json({ error: '請填寫地址' }); return }
 
   const distance = estimateDistance()
-  let discount = 0
-  let promoId: string | null = null
-  if (promo_code) {
-    const promo = await prisma.promoCode.findFirst({ where: { code: promo_code.toUpperCase(), active: true } })
-    if (promo && (!promo.usageMax || promo.usageCount < promo.usageMax)) { discount = promo.discount; promoId = promo.id }
-  }
-  const fare = calcFare(distance, speed_tier, discount)
-  const id = await nextOrderId()
 
+  // Atomic promo consume
+  const promo = promo_code ? await consumePromo(promo_code) : { discount: 0, id: null }
+
+  // Referral first-order discount (NT$50, only if user has never placed an order)
+  const userOrderCount = await prisma.order.count({ where: { userId: req.user!.id } })
+  const userMeta = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { referralBy: true } })
+  const referralDiscount = (userOrderCount === 0 && !!userMeta?.referralBy) ? 50 : 0
+
+  const totalDiscount = promo.discount + referralDiscount
+  const fare = calcFare(distance, speed_tier, totalDiscount)
+  const id = await nextOrderId()
   const initialStatus = scheduled_at ? 'pending' : 'matching'
 
   const order = await prisma.order.create({
@@ -108,8 +131,6 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     },
     include: { driver: true },
   })
-
-  if (promoId) await prisma.promoCode.update({ where: { id: promoId }, data: { usageCount: { increment: 1 } } })
 
   await notify(req.user!.id, 'info', '訂單已建立', `${id} — 正在媒合任務夥伴`)
 
@@ -169,5 +190,21 @@ router.post('/:id/rate', requireAuth, async (req: AuthRequest, res) => {
 
   res.json({ ok: true })
 })
+
+// ── Recurring order helpers ──────────────────────────────────────────────────
+export function calcNextRun(schedule: string, from: Date): Date {
+  const next = new Date(from)
+  if (schedule === 'daily') {
+    next.setDate(next.getDate() + 1)
+  } else if (schedule === 'weekly') {
+    next.setDate(next.getDate() + 7)
+  } else if (schedule === 'monthly') {
+    next.setMonth(next.getMonth() + 1)
+  } else {
+    next.setDate(next.getDate() + 1) // fallback: daily
+  }
+  next.setHours(8, 0, 0, 0) // run at 08:00
+  return next
+}
 
 export default router

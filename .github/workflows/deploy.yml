@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    name: Build & Deploy
+    name: Deploy
     runs-on: ubuntu-latest
 
     steps:
@@ -21,29 +21,15 @@ jobs:
             package-lock.json
             backend/package-lock.json
 
-      # ── Frontend ────────────────────────────────────────────
-      - name: Install frontend deps
-        run: npm ci
+      # ── Quick TypeScript check (fail fast before SSH) ───────
+      - name: Check frontend types
+        run: npm ci && npx tsc --noEmit
 
-      - name: Build frontend
-        env:
-          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
-        run: npm run build
-
-      # ── Backend ──────────────────────────────────────────────
-      - name: Install backend deps
+      - name: Check backend types
         working-directory: backend
-        run: npm ci
+        run: npm ci && npx tsc --noEmit
 
-      - name: Generate Prisma client
-        working-directory: backend
-        run: npx prisma generate
-
-      - name: Compile backend
-        working-directory: backend
-        run: npm run build
-
-      # ── Deploy via SSH ───────────────────────────────────────
+      # ── Deploy via SSH — build happens on the server ─────────
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -57,12 +43,15 @@ jobs:
             # Pull latest code
             git pull origin main
 
-            # Frontend: copy built dist to nginx webroot
+            # ── Frontend ───────────────────────────────────────
+            npm ci
+            npm run build
             rsync -a --delete dist/ /var/www/ufly-static/
 
-            # Backend: install deps + generate Prisma + migrate + restart
+            # ── Backend ────────────────────────────────────────
             cd backend
             npm ci --omit=dev
             npx prisma generate
             npx prisma migrate deploy
+            npm run build
             pm2 restart ufly-backend
