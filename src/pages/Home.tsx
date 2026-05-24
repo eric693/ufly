@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import {
   FileText, Package, ShoppingBag, ClipboardList,
@@ -35,6 +35,7 @@ const PROMOS = [
     code: 'NEW100',
     details: '新會員首次下單專屬優惠，折扣 NT$50，無最低消費限制。每個帳號限用一次，不可與其他優惠合併使用。',
     expiry: '2026-06-30',
+    link: '/order',
   },
   {
     tag: '會員方案', title: '升級 Ufly Pro 享無限優惠', desc: '每月固定費，無限次下單',
@@ -42,6 +43,7 @@ const PROMOS = [
     code: null,
     details: 'Ufly Pro 月費 NT$299，享每月無限次配送、優先媒合、專屬客服。訂閱後立即生效，隨時可取消續訂。',
     expiry: '長期方案',
+    link: '/profile',
   },
   {
     tag: '推薦好友', title: '邀請好友各得 NT$100', desc: '分享連結即可獲得優惠',
@@ -49,10 +51,12 @@ const PROMOS = [
     code: null,
     details: '分享您的專屬邀請連結，好友完成首單後，雙方各獲得 NT$100 折扣券，可於下次下單時使用，有效期 90 天。',
     expiry: '長期活動',
+    link: '/profile',
   },
 ]
 
 export default function Home() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab]       = useState(0)
   const [search, setSearch]             = useState('')
   const [selectedPromo, setSelectedPromo] = useState<typeof PROMOS[0] | null>(null)
@@ -228,7 +232,7 @@ export default function Home() {
             )}
 
             <button
-              onClick={() => setSelectedPromo(null)}
+              onClick={() => { setSelectedPromo(null); navigate(selectedPromo.link) }}
               className={`w-full py-3 rounded-2xl text-white font-bold text-sm bg-gradient-to-r ${selectedPromo.color} hover:opacity-90 transition-opacity`}>
               {selectedPromo.code ? '立即使用折扣碼' : '立即前往'}
             </button>
