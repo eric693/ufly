@@ -11,6 +11,9 @@ import Profile from './pages/Profile'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 
+import DriverQueue from './pages/driver/DriverQueue'
+import DriverOrderDetail from './pages/driver/DriverOrderDetail'
+
 import Dashboard from './pages/admin/Dashboard'
 import AdminOrders from './pages/admin/Orders'
 import AdminDrivers from './pages/admin/Drivers'
@@ -33,6 +36,9 @@ export default function App() {
           <Route path="/history"  element={<OrderHistory />} />
           <Route path="/profile"  element={<Profile />} />
         </Route>
+
+        <Route path="/driver"              element={<DriverQueue />} />
+        <Route path="/driver/order/:id"   element={<DriverOrderDetail />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index            element={<Dashboard />} />

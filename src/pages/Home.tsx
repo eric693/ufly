@@ -4,7 +4,7 @@ import {
   FileText, Package, ShoppingBag, ClipboardList,
   Briefcase, Star, Key, Receipt, Gift, MapPin,
   ArrowRight, ChevronRight, Clock, Shield, Users,
-  Truck, Zap, Search, Home as HomeIcon, CalendarClock,
+  Truck, Zap, Search, Home as HomeIcon, CalendarClock, X,
 } from 'lucide-react'
 
 const SERVICE_TABS = ['幫我送', '幫我取', '任務支援', '幫排隊']
@@ -24,19 +24,38 @@ const SERVICES = [
 ]
 
 const SAVED_PLACES = [
-  { icon: HomeIcon,    label: '家',   address: '豐原區中正路100號' },
-  { icon: Briefcase,   label: '公司', address: '西屯區台灣大道三段' },
+  { icon: HomeIcon,    label: '家',   address: '台北市信義區松仁路100號' },
+  { icon: Briefcase,   label: '公司', address: '台北市中山區南京東路三段' },
 ]
 
 const PROMOS = [
-  { tag: '限時優惠', title: '首次下單享 NT$50 折扣',    desc: '輸入 NEW100 折扣碼',       color: 'from-indigo-500 to-purple-600' },
-  { tag: '會員方案', title: '升級 Ufly Pro 享無限優惠', desc: '每月固定費，無限次下單',    color: 'from-amber-500 to-orange-600' },
-  { tag: '推薦好友', title: '邀請好友各得 NT$100',      desc: '分享連結即可獲得優惠',      color: 'from-emerald-500 to-teal-600' },
+  {
+    tag: '限時優惠', title: '首次下單享 NT$50 折扣', desc: '輸入 NEW100 折扣碼',
+    color: 'from-indigo-500 to-purple-600',
+    code: 'NEW100',
+    details: '新會員首次下單專屬優惠，折扣 NT$50，無最低消費限制。每個帳號限用一次，不可與其他優惠合併使用。',
+    expiry: '2026-06-30',
+  },
+  {
+    tag: '會員方案', title: '升級 Ufly Pro 享無限優惠', desc: '每月固定費，無限次下單',
+    color: 'from-amber-500 to-orange-600',
+    code: null,
+    details: 'Ufly Pro 月費 NT$299，享每月無限次配送、優先媒合、專屬客服。訂閱後立即生效，隨時可取消續訂。',
+    expiry: '長期方案',
+  },
+  {
+    tag: '推薦好友', title: '邀請好友各得 NT$100', desc: '分享連結即可獲得優惠',
+    color: 'from-emerald-500 to-teal-600',
+    code: null,
+    details: '分享您的專屬邀請連結，好友完成首單後，雙方各獲得 NT$100 折扣券，可於下次下單時使用，有效期 90 天。',
+    expiry: '長期活動',
+  },
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState(0)
-  const [search, setSearch]       = useState('')
+  const [activeTab, setActiveTab]       = useState(0)
+  const [search, setSearch]             = useState('')
+  const [selectedPromo, setSelectedPromo] = useState<typeof PROMOS[0] | null>(null)
 
   return (
     <div className="animate-fade-in">
@@ -143,7 +162,9 @@ export default function Home() {
                 <span className="badge bg-white/20 text-white text-[10px] mb-2">{p.tag}</span>
                 <div className="font-bold text-sm leading-snug mb-1">{p.title}</div>
                 <div className="text-white/75 text-xs">{p.desc}</div>
-                <button className="mt-3 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors">
+                <button
+                  onClick={() => setSelectedPromo(p)}
+                  className="mt-3 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors">
                   查看優惠內容 →
                 </button>
               </div>
@@ -176,6 +197,44 @@ export default function Home() {
         </section>
 
       </div>
+
+      {/* Promo detail modal */}
+      {selectedPromo && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedPromo(null)} />
+          <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl">
+            <button
+              onClick={() => setSelectedPromo(null)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-paper-100 hover:bg-paper-200 transition-colors">
+              <X size={16} className="text-paper-600" />
+            </button>
+
+            <div className={`inline-block px-2.5 py-1 rounded-lg text-white text-xs font-semibold bg-gradient-to-r ${selectedPromo.color} mb-3`}>
+              {selectedPromo.tag}
+            </div>
+            <h3 className="text-lg font-bold text-paper-900 mb-2">{selectedPromo.title}</h3>
+            <p className="text-paper-600 text-sm leading-relaxed mb-4">{selectedPromo.details}</p>
+
+            <div className="bg-paper-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
+              <span className="text-xs text-paper-500">有效期限</span>
+              <span className="text-xs font-semibold text-paper-800">{selectedPromo.expiry}</span>
+            </div>
+
+            {selectedPromo.code && (
+              <div className="bg-paper-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
+                <span className="text-xs text-paper-500">折扣碼</span>
+                <span className="text-sm font-bold tracking-widest text-paper-900">{selectedPromo.code}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setSelectedPromo(null)}
+              className={`w-full py-3 rounded-2xl text-white font-bold text-sm bg-gradient-to-r ${selectedPromo.color} hover:opacity-90 transition-opacity`}>
+              {selectedPromo.code ? '立即使用折扣碼' : '立即前往'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

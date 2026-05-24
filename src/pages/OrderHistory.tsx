@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, RotateCcw, Star, SlidersHorizontal, MapPin, Package, Loader2 } from 'lucide-react'
+import { Search, RotateCcw, Star, SlidersHorizontal, MapPin, Package, Loader2, X } from 'lucide-react'
 import RatingModal from '../components/RatingModal'
 import api from '../lib/api'
 import type { OrderStatus } from '../types'
@@ -61,6 +61,16 @@ export default function OrderHistory() {
     setRatingOrder(null)
   }
 
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm('確定要取消訂單？')) return
+    try {
+      await api.put(`/orders/${orderId}/cancel`)
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' as OrderStatus } : o))
+    } catch (e: any) {
+      alert(e?.response?.data?.error || '取消失敗')
+    }
+  }
+
   if (loading) return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <Loader2 size={28} className="animate-spin text-paper-400" />
@@ -113,6 +123,13 @@ export default function OrderHistory() {
                         onClick={() => setRatingOrder(recent)}
                         className="flex items-center gap-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-2xl px-4 py-2 text-sm font-medium transition-colors">
                         <Star size={13} /> 評分
+                      </button>
+                    )}
+                    {['pending', 'matching'].includes(recent.status) && (
+                      <button
+                        onClick={() => cancelOrder(recent.id)}
+                        className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-2xl px-4 py-2 text-sm font-medium transition-colors">
+                        <X size={13} /> 取消
                       </button>
                     )}
                     <Link to="/order" className="flex items-center gap-1.5 bg-paper-100 hover:bg-paper-200 text-paper-800 rounded-2xl px-4 py-2 text-sm font-medium transition-colors">
@@ -168,6 +185,12 @@ export default function OrderHistory() {
                     <button onClick={() => setRatingOrder(o)}
                       className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 rounded-xl px-2.5 py-1.5 text-xs font-medium text-yellow-700 transition-colors">
                       <Star size={11} /> 評分
+                    </button>
+                  )}
+                  {['pending', 'matching'].includes(o.status) && (
+                    <button onClick={() => cancelOrder(o.id)}
+                      className="flex items-center gap-1 bg-red-50 border border-red-200 hover:bg-red-100 rounded-xl px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors">
+                      <X size={11} /> 取消
                     </button>
                   )}
                   <Link to="/order" className="flex items-center gap-1 bg-paper-100 hover:bg-paper-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-paper-700 transition-colors">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Phone, Star, MapPin, TrendingUp, Loader2 } from 'lucide-react'
+import { Search, Plus, Phone, Star, MapPin, TrendingUp, Loader2, X, Trash2, Edit2, Check } from 'lucide-react'
 import api from '../../lib/api'
 
 const STATUS_LABEL: Record<string, string> = { online: '在線', busy: '任務中', offline: '離線' }
@@ -7,16 +7,28 @@ const STATUS_CLASS: Record<string, string> = {
   online: 'admin-badge-green', busy: 'admin-badge-yellow', offline: 'admin-badge-gray',
 }
 
+type DriverForm = { name: string; phone: string; area: string }
+const EMPTY_FORM: DriverForm = { name: '', phone: '', area: '' }
+
 export default function AdminDrivers() {
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [filter, setFilter]   = useState<'all' | 'online' | 'busy' | 'offline'>('all')
+  const [drivers, setDrivers]   = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [filter, setFilter]     = useState<'all' | 'online' | 'busy' | 'offline'>('all')
   const [updating, setUpdating] = useState<string | null>(null)
 
-  useEffect(() => {
+  // modal state
+  const [modal, setModal]       = useState<'add' | 'edit' | null>(null)
+  const [editTarget, setEditTarget] = useState<any>(null)
+  const [form, setForm]         = useState<DriverForm>(EMPTY_FORM)
+  const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const load = () => {
+    setLoading(true)
     api.get('/admin/drivers').then(r => setDrivers(r.data || [])).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  }
+  useEffect(() => { load() }, [])
 
   const filtered = drivers.filter(d => {
     if (filter !== 'all' && d.status !== filter) return false
@@ -38,11 +50,41 @@ export default function AdminDrivers() {
     } catch { /* ignore */ } finally { setUpdating(null) }
   }
 
+  const openAdd = () => { setForm(EMPTY_FORM); setModal('add') }
+  const openEdit = (d: any) => { setForm({ name: d.name, phone: d.phone || '', area: d.area || '' }); setEditTarget(d); setModal('edit') }
+  const closeModal = () => { setModal(null); setEditTarget(null) }
+
+  const save = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    try {
+      if (modal === 'add') {
+        const { data } = await api.post('/admin/drivers', form)
+        setDrivers(prev => [data, ...prev])
+      } else if (modal === 'edit' && editTarget) {
+        const { data } = await api.put(`/admin/drivers/${editTarget.id}`, form)
+        setDrivers(prev => prev.map(d => d.id === editTarget.id ? data : d))
+      }
+      closeModal()
+    } catch { /* ignore */ } finally { setSaving(false) }
+  }
+
+  const deleteDriver = async (id: string) => {
+    if (!confirm('確定要刪除此夥伴？')) return
+    setDeleting(id)
+    try {
+      await api.delete(`/admin/drivers/${id}`)
+      setDrivers(prev => prev.filter(d => d.id !== id))
+    } catch { /* ignore */ } finally { setDeleting(null) }
+  }
+
   return (
     <div className="animate-fade-in space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">夥伴管理</h1>
-        <button className="btn-primary py-2 text-sm"><Plus size={16} /> 新增夥伴</button>
+        <button onClick={openAdd} className="btn-primary py-2 text-sm flex items-center gap-1.5">
+          <Plus size={16} /> 新增夥伴
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -85,11 +127,19 @@ export default function AdminDrivers() {
                   <div className="w-12 h-12 bg-surface-700 rounded-2xl flex items-center justify-center text-lg font-bold border border-surface-600">{d.name[0]}</div>
                   <div className={`absolute -bottom-0.5 -right-0.5 ${d.status === 'online' ? 'status-online' : d.status === 'busy' ? 'status-busy' : 'status-offline'}`} />
                 </div>
-                <span className={STATUS_CLASS[d.status] || 'admin-badge-gray'}>{STATUS_LABEL[d.status]}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={STATUS_CLASS[d.status] || 'admin-badge-gray'}>{STATUS_LABEL[d.status]}</span>
+                  <button onClick={() => openEdit(d)} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-surface-600 transition-colors">
+                    <Edit2 size={13} />
+                  </button>
+                  <button onClick={() => deleteDriver(d.id)} disabled={deleting === d.id} className="p-1 rounded-lg text-gray-500 hover:text-red-400 hover:bg-surface-600 transition-colors disabled:opacity-40">
+                    {deleting === d.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <div className="font-bold">{d.name}</div>
-                <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5"><MapPin size={11} /> {d.area}</div>
+                <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5"><MapPin size={11} /> {d.area || '未設定'}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-surface-700 rounded-xl p-2.5">
@@ -120,6 +170,59 @@ export default function AdminDrivers() {
           {filtered.length === 0 && (
             <div className="col-span-full py-12 text-center text-gray-500 text-sm">無符合夥伴</div>
           )}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={closeModal} />
+          <div className="relative w-full max-w-sm bg-surface-900 border border-surface-700 rounded-3xl p-6 shadow-2xl mx-4">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-lg">{modal === 'add' ? '新增夥伴' : '編輯夥伴'}</h3>
+              <button onClick={closeModal} className="p-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-surface-700 transition-colors"><X size={16} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">姓名 *</label>
+                <input
+                  className="w-full bg-surface-800 border border-surface-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-white transition-colors"
+                  placeholder="例：王小明"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">電話</label>
+                <input
+                  className="w-full bg-surface-800 border border-surface-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-white transition-colors"
+                  placeholder="0912-345-678"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">服務區域</label>
+                <input
+                  className="w-full bg-surface-800 border border-surface-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-white transition-colors"
+                  placeholder="例：信義區"
+                  value={form.area}
+                  onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={closeModal} className="flex-1 py-2.5 rounded-xl bg-surface-700 hover:bg-surface-600 text-sm font-medium transition-colors">取消</button>
+              <button
+                onClick={save}
+                disabled={saving || !form.name.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-white text-black text-sm font-bold hover:bg-gray-200 disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                {modal === 'add' ? '新增' : '儲存'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

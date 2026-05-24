@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String?  @unique
+  phone        String?
+  avatar       String?
+  googleId     String?  @unique @map("google_id")
+  lineId       String?  @unique @map("line_id")
+  role         String   @default("customer")
+  rating       Float    @default(5.0)
+  totalOrders  Int      @default(0) @map("total_orders")
+  referralCode String?  @unique @map("referral_code")
+  referralBy   String?  @map("referral_by")
+  enterpriseId String?  @map("enterprise_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  enterprise      Enterprise?    @relation(fields: [enterpriseId], references: [id])
+  orders          Order[]
+  savedAddresses  SavedAddress[]
+  ratings         Rating[]
+  notifications   Notification[]
+  recurringOrders RecurringOrder[]
+
+  @@map("users")
+}
+
+model Driver {
+  id         String   @id @default(uuid())
+  name       String
+  phone      String?
+  area       String?
+  status     String   @default("offline")
+  rating     Float    @default(5.0)
+  totalTrips Int      @default(0) @map("total_trips")
+  lat        Float    @default(25.0330)
+  lng        Float    @default(121.5654)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  orders  Order[]
+  ratings Rating[]
+
+  @@map("drivers")
+}
+
+model Order {
+  id              String    @id
+  userId          String    @map("user_id")
+  driverId        String?   @map("driver_id")
+  enterpriseId    String?   @map("enterprise_id")
+  serviceType     String    @default("delivery") @map("service_type")
+  status          String    @default("pending")
+  pickupAddress   String    @map("pickup_address")
+  pickupPhone     String?   @map("pickup_phone")
+  deliveryAddress String    @map("delivery_address")
+  deliveryPhone   String?   @map("delivery_phone")
+  itemContent     String?   @map("item_content")
+  itemNote        String?   @map("item_note")
+  speedTier       String    @default("standard") @map("speed_tier")
+  baseFee         Int       @default(120) @map("base_fee")
+  surcharge       Int       @default(0)
+  discount        Int       @default(0)
+  totalFee        Int       @default(120) @map("total_fee")
+  distance        Float     @default(0)
+  duration        Int       @default(0)
+  scheduledAt     DateTime? @map("scheduled_at")
+  rated           Boolean   @default(false)
+  recurringId     String?   @map("recurring_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id])
+  driver Driver? @relation(fields: [driverId], references: [id])
+  ratings Rating[]
+
+  @@map("orders")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  userId    String?  @map("user_id")
+  driverId  String?  @map("driver_id")
+  score     Int
+  tags      String?
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order  Order   @relation(fields: [orderId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+  driver Driver? @relation(fields: [driverId], references: [id])
+
+  @@map("ratings")
+}
+
+model SavedAddress {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  label     String
+  address   String
+  type      String   @default("other")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("saved_addresses")
+}
+
+model Enterprise {
+  id             String   @id @default(uuid())
+  name           String
+  taxId          String?  @map("tax_id")
+  contactName    String?  @map("contact_name")
+  contactPhone   String?  @map("contact_phone")
+  contactEmail   String?  @map("contact_email")
+  billingAddress String?  @map("billing_address")
+  monthlyLimit   Int      @default(0) @map("monthly_limit")
+  balance        Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  members User[]
+
+  @@map("enterprises")
+}
+
+model RecurringOrder {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  serviceType     String    @default("delivery") @map("service_type")
+  pickupAddress   String    @map("pickup_address")
+  deliveryAddress String    @map("delivery_address")
+  itemContent     String?   @map("item_content")
+  speedTier       String    @default("standard") @map("speed_tier")
+  schedule        String
+  active          Boolean   @default(true)
+  nextRun         DateTime? @map("next_run")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("recurring_orders")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   @default("info")
+  title     String
+  body      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
