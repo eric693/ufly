@@ -7,7 +7,7 @@ interface User {
   email?: string
   phone?: string
   avatar?: string
-  role: 'customer' | 'admin'
+  role: 'customer' | 'admin' | 'driver'
   rating: number
   total_orders: number
 }

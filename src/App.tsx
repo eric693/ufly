@@ -13,6 +13,7 @@ import AuthCallback from './pages/AuthCallback'
 
 import DriverQueue from './pages/driver/DriverQueue'
 import DriverOrderDetail from './pages/driver/DriverOrderDetail'
+import { AdminRoute, DriverRoute } from './components/ProtectedRoute'
 
 import Dashboard from './pages/admin/Dashboard'
 import AdminOrders from './pages/admin/Orders'
@@ -37,17 +38,21 @@ export default function App() {
           <Route path="/profile"  element={<Profile />} />
         </Route>
 
-        <Route path="/driver"              element={<DriverQueue />} />
-        <Route path="/driver/order/:id"   element={<DriverOrderDetail />} />
+        <Route element={<DriverRoute />}>
+          <Route path="/driver"            element={<DriverQueue />} />
+          <Route path="/driver/order/:id"  element={<DriverOrderDetail />} />
+        </Route>
 
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index            element={<Dashboard />} />
-          <Route path="orders"    element={<AdminOrders />} />
-          <Route path="drivers"   element={<AdminDrivers />} />
-          <Route path="map"       element={<LiveMap />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="customers" element={<AdminCustomers />} />
-          <Route path="settings"  element={<AdminSettings />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index            element={<Dashboard />} />
+            <Route path="orders"    element={<AdminOrders />} />
+            <Route path="drivers"   element={<AdminDrivers />} />
+            <Route path="map"       element={<LiveMap />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="customers" element={<AdminCustomers />} />
+            <Route path="settings"  element={<AdminSettings />} />
+          </Route>
         </Route>
       </Routes>
     </AuthProvider>

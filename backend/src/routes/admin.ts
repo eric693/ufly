@@ -1,8 +1,32 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
+import fs from 'fs'
+import path from 'path'
 import prisma from '../lib/prisma'
 import { requireAdmin } from '../middleware/requireAuth'
 import { serializeOrder, serializeDriver, serializeUser } from '../lib/serializer'
+
+const SETTINGS_PATH = path.join(__dirname, '../../settings.json')
+const DEFAULT_SETTINGS = {
+  platformName: 'Ufly 城市任務平台',
+  serviceArea: '台北市（以中正區為主）',
+  baseFee: '120',
+  expressSurcharge: '30',
+  prioritySurcharge: '80',
+  urgentSurcharge: '150',
+  notifyNewOrder: true,
+  notifyDriverMatch: true,
+  notifyOrderComplete: true,
+  maxOrderDistance: '25',
+  autoMatchRadius: '5',
+}
+function readSettings() {
+  try {
+    return fs.existsSync(SETTINGS_PATH)
+      ? { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')) }
+      : DEFAULT_SETTINGS
+  } catch { return DEFAULT_SETTINGS }
+}
 
 const router = Router()
 
@@ -116,6 +140,65 @@ router.get('/analytics/weekly', requireAdmin, async (_req, res) => {
     days.push({ date: d.toISOString().slice(0, 10), label, revenue: revenueAgg._sum.totalFee ?? 0, orders })
   }
   res.json(days)
+})
+
+router.get('/analytics/daily', requireAdmin, async (req, res) => {
+  const numDays = Math.min(parseInt((req.query.days as string) || '7'), 90)
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - (numDays - 1))
+  startDate.setHours(0, 0, 0, 0)
+
+  const allOrders = await prisma.order.findMany({
+    where: { createdAt: { gte: startDate } },
+    select: { createdAt: true, totalFee: true, status: true },
+  })
+
+  const dayMap = new Map<string, { revenue: number; orders: number }>()
+  for (let i = numDays - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0)
+    dayMap.set(d.toISOString().slice(0, 10), { revenue: 0, orders: 0 })
+  }
+  for (const o of allOrders) {
+    const key = o.createdAt.toISOString().slice(0, 10)
+    const entry = dayMap.get(key)
+    if (entry) { entry.orders++; if (o.status === 'completed') entry.revenue += o.totalFee }
+  }
+
+  const result = Array.from(dayMap.entries()).map(([date, data]) => {
+    const d = new Date(date + 'T00:00:00')
+    return { date, label: `${d.getMonth() + 1}/${d.getDate()}`, ...data }
+  })
+  res.json(result)
+})
+
+router.get('/analytics/hourly', requireAdmin, async (_req, res) => {
+  const start = new Date(); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0)
+  const orders = await prisma.order.findMany({ where: { createdAt: { gte: start } }, select: { createdAt: true } })
+  const counts = Array(24).fill(0)
+  for (const o of orders) counts[o.createdAt.getHours()]++
+  res.json(counts)
+})
+
+router.get('/analytics/services', requireAdmin, async (_req, res) => {
+  const groups = await prisma.order.groupBy({ by: ['serviceType'], _count: { _all: true } })
+  const total = groups.reduce((s, g) => s + g._count._all, 0)
+  res.json(groups.map(g => ({
+    service_type: g.serviceType,
+    count: g._count._all,
+    pct: total > 0 ? Math.round(g._count._all / total * 100) : 0,
+  })))
+})
+
+router.get('/settings', requireAdmin, (_req, res) => {
+  res.json(readSettings())
+})
+
+router.put('/settings', requireAdmin, (req, res) => {
+  try {
+    const updated = { ...readSettings(), ...req.body }
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2))
+    res.json(updated)
+  } catch { res.status(500).json({ error: 'Failed to save settings' }) }
 })
 
 export default router

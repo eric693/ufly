@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, ClipboardList, Users, Navigation,
   Settings, ChevronLeft, ChevronRight, Menu, X,
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
   const { pathname } = useLocation()
+  const { user } = useAuth()
   const [collapsed, setCollapsed]   = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen, setNotifOpen]   = useState(false)
@@ -120,11 +122,11 @@ export default function AdminLayout() {
             </button>
             <div className="flex items-center gap-2 pl-2 border-l border-surface-700">
               <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">管</span>
+                <span className="text-white text-xs font-bold">{(user?.name || '管')[0]}</span>
               </div>
               <div className="hidden sm:block">
-                <div className="text-sm font-medium">管理員</div>
-                <div className="text-gray-400 text-xs">admin@ufly.tw</div>
+                <div className="text-sm font-medium">{user?.name || '管理員'}</div>
+                <div className="text-gray-400 text-xs">{user?.email || ''}</div>
               </div>
             </div>
           </div>

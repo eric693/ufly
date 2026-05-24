@@ -44,6 +44,7 @@ export default function OrderTracking() {
   const [selectedId, setSelectedId]   = useState<string | null>(focusId || null)
   const [loading, setLoading]         = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [msgToast, setMsgToast]       = useState(false)
   const socketRef                     = useRef(getSocket())
 
   const fetchOrders = async () => {
@@ -195,9 +196,25 @@ export default function OrderTracking() {
                           <Phone size={18} />
                         </a>
                       )}
-                      <button className="p-3 bg-paper-100 hover:bg-paper-200 rounded-2xl transition-colors">
-                        <MessageCircle size={18} />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => {
+                            if (order.driver_phone) {
+                              window.location.href = `sms:${order.driver_phone}`
+                            } else {
+                              setMsgToast(true)
+                              setTimeout(() => setMsgToast(false), 2500)
+                            }
+                          }}
+                          className="p-3 bg-paper-100 hover:bg-paper-200 rounded-2xl transition-colors">
+                          <MessageCircle size={18} />
+                        </button>
+                        {msgToast && (
+                          <div className="absolute right-0 top-full mt-2 bg-paper-900 text-white text-xs px-3 py-2 rounded-xl whitespace-nowrap z-10">
+                            聯絡功能即將推出
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
