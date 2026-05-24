@@ -95,11 +95,11 @@ export default function CreateOrder() {
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => step === 'info' ? navigate(-1) : setStep(step === 'speed' ? 'info' : 'speed')}
-            className="p-2 rounded-xl bg-surface-700 hover:bg-surface-600 transition-colors">
+            className="p-2 rounded-xl bg-white hover:bg-paper-100 transition-colors">
             <ArrowLeft size={20} />
           </button>
           <div>
-            <div className="text-surface-300 text-xs mb-0.5">{SERVICE_LABELS[service]}</div>
+            <div className="text-paper-500 text-xs mb-0.5">{SERVICE_LABELS[service]}</div>
             <h1 className="text-xl font-bold">填寫任務資訊</h1>
           </div>
         </div>
@@ -113,11 +113,11 @@ export default function CreateOrder() {
             return (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors
-                  ${done ? 'bg-white text-black' : active ? 'bg-white/10 border-2 border-white text-white' : 'bg-surface-700 text-surface-400'}`}>
+                  ${done ? 'bg-paper-900 text-white' : active ? 'border-2 border-paper-900 text-paper-900 bg-white' : 'bg-paper-200 text-paper-500'}`}>
                   {done ? <Check size={14} /> : i + 1}
                 </div>
-                <span className={`text-xs font-medium ${active ? 'text-white' : 'text-surface-400'}`}>{labels[i]}</span>
-                {i < 2 && <div className="flex-1 h-px bg-surface-700" />}
+                <span className={`text-xs font-medium ${active ? 'text-paper-900' : 'text-paper-500'}`}>{labels[i]}</span>
+                {i < 2 && <div className="flex-1 h-px bg-paper-200" />}
               </div>
             )
           })}
@@ -131,7 +131,7 @@ export default function CreateOrder() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                    <Navigation size={12} className="text-white" />
+                    <Navigation size={12} className="text-paper-900" />
                   </div>
                   <h2 className="font-bold text-sm">取件資訊</h2>
                 </div>
@@ -140,21 +140,21 @@ export default function CreateOrder() {
                   {SAVED_ADDRESSES.map(a => (
                     <button key={a.label}
                       onClick={() => setForm(p => ({ ...p, pickupAddress: a.address }))}
-                      className="flex items-center gap-1 px-2 py-1 bg-surface-700 hover:bg-surface-600
-                                 rounded-lg text-xs text-surface-200 hover:text-white transition-colors">
-                      <a.icon size={11} className="text-white" /> {a.label}
+                      className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-paper-100
+                                 rounded-lg text-xs text-paper-600 hover:text-paper-900 transition-colors">
+                      <a.icon size={11} className="text-paper-900" /> {a.label}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="input-group">
                 <div className="flex items-center">
-                  <MapPin size={16} className="text-surface-300 ml-4 flex-shrink-0" />
+                  <MapPin size={16} className="text-paper-500 ml-4 flex-shrink-0" />
                   <input className="input-field" placeholder="取件地址（越完整估價越準）"
                     value={form.pickupAddress} onChange={handleChange('pickupAddress')} />
                 </div>
                 <div className="flex items-center">
-                  <Phone size={16} className="text-surface-300 ml-4 flex-shrink-0" />
+                  <Phone size={16} className="text-paper-500 ml-4 flex-shrink-0" />
                   <input className="input-field" placeholder="取件聯絡電話" type="tel"
                     value={form.pickupPhone} onChange={handleChange('pickupPhone')} />
                 </div>
@@ -165,8 +165,8 @@ export default function CreateOrder() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-surface-500 rounded-full flex items-center justify-center">
-                    <MapPin size={12} className="text-white" />
+                  <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center">
+                    <MapPin size={12} className="text-amber-600" />
                   </div>
                   <h2 className="font-bold text-sm">送達資訊</h2>
                 </div>
@@ -174,21 +174,21 @@ export default function CreateOrder() {
                   {SAVED_ADDRESSES.map(a => (
                     <button key={a.label}
                       onClick={() => setForm(p => ({ ...p, deliveryAddress: a.address }))}
-                      className="flex items-center gap-1 px-2 py-1 bg-surface-700 hover:bg-surface-600
-                                 rounded-lg text-xs text-surface-200 hover:text-white transition-colors">
-                      <a.icon size={11} className="text-white" /> {a.label}
+                      className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-paper-100
+                                 rounded-lg text-xs text-paper-600 hover:text-paper-900 transition-colors">
+                      <a.icon size={11} className="text-paper-900" /> {a.label}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="input-group">
                 <div className="flex items-center">
-                  <MapPin size={16} className="text-surface-300 ml-4 flex-shrink-0" />
+                  <MapPin size={16} className="text-paper-500 ml-4 flex-shrink-0" />
                   <input className="input-field" placeholder="送達地址"
                     value={form.deliveryAddress} onChange={handleChange('deliveryAddress')} />
                 </div>
                 <div className="flex items-center">
-                  <Phone size={16} className="text-surface-300 ml-4 flex-shrink-0" />
+                  <Phone size={16} className="text-paper-500 ml-4 flex-shrink-0" />
                   <input className="input-field" placeholder="收件人電話" type="tel"
                     value={form.deliveryPhone} onChange={handleChange('deliveryPhone')} />
                 </div>
@@ -198,19 +198,19 @@ export default function CreateOrder() {
             {/* Item */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 bg-surface-500 rounded-full flex items-center justify-center">
-                  <Package size={12} className="text-white" />
+                <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Package size={12} className="text-orange-600" />
                 </div>
                 <h2 className="font-bold text-sm">物品資訊</h2>
               </div>
               <div className="input-group">
                 <div className="flex items-center">
-                  <FileText size={16} className="text-surface-300 ml-4 flex-shrink-0" />
+                  <FileText size={16} className="text-paper-500 ml-4 flex-shrink-0" />
                   <input className="input-field" placeholder="物品內容，例如：合約、樣品、小包裹"
                     value={form.itemContent} onChange={handleChange('itemContent')} />
                 </div>
                 <div className="flex items-start pt-1">
-                  <StickyNote size={16} className="text-surface-300 ml-4 mt-4 flex-shrink-0" />
+                  <StickyNote size={16} className="text-paper-500 ml-4 mt-4 flex-shrink-0" />
                   <textarea className="input-field resize-none min-h-[80px]"
                     placeholder="備註，例如：請到櫃台取件、送達前請電話聯繫"
                     value={form.itemNote} onChange={handleChange('itemNote')} />
@@ -222,16 +222,16 @@ export default function CreateOrder() {
             <div>
               <button onClick={() => setIsScheduled(!isScheduled)}
                 className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all
-                  ${isScheduled ? 'border-white bg-white/8' : 'border-surface-600 bg-surface-700 hover:border-surface-500'}`}>
-                <CalendarClock size={18} className={isScheduled ? 'text-white' : 'text-surface-300'} />
+                  ${isScheduled ? 'border-paper-900 bg-paper-50' : 'border-paper-200 bg-white hover:border-paper-400'}`}>
+                <CalendarClock size={18} className={isScheduled ? 'text-paper-900' : 'text-paper-500'} />
                 <div className="flex-1 text-left">
-                  <div className={`font-semibold text-sm ${isScheduled ? 'text-white' : 'text-surface-200'}`}>
+                  <div className={`font-semibold text-sm ${isScheduled ? 'text-paper-900' : 'text-paper-600'}`}>
                     預約取件時間
                   </div>
-                  <div className="text-surface-400 text-xs mt-0.5">指定未來時間取件，適合提前安排</div>
+                  <div className="text-paper-500 text-xs mt-0.5">指定未來時間取件，適合提前安排</div>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
-                  ${isScheduled ? 'border-white bg-white' : 'border-surface-500'}`}>
+                  ${isScheduled ? 'border-paper-900 bg-paper-900' : 'border-paper-300'}`}>
                   {isScheduled && <Check size={11} className="text-white" />}
                 </div>
               </button>
@@ -242,9 +242,8 @@ export default function CreateOrder() {
                     type="datetime-local"
                     value={scheduleTime}
                     onChange={e => setScheduleTime(e.target.value)}
-                    className="w-full bg-surface-700 border border-white/30 rounded-2xl
-                               px-4 py-3 text-sm text-white outline-none focus:border-white
-                               [color-scheme:dark]"
+                    className="w-full bg-white border border-paper-200 rounded-2xl
+                               px-4 py-3 text-sm text-paper-900 outline-none focus:border-paper-600"
                   />
                 </div>
               )}
@@ -266,26 +265,26 @@ export default function CreateOrder() {
               return (
                 <button key={opt.id} onClick={() => setSpeed(opt.id)}
                   className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200
-                    ${active ? 'border-white bg-white/8' : 'border-surface-600 bg-surface-700 hover:border-surface-500'}`}>
+                    ${active ? 'border-paper-900 bg-indigo-50' : 'border-paper-200 bg-white hover:border-paper-400'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center
-                        ${active ? 'bg-white/10' : 'bg-surface-600'}`}>
-                        <Icon size={20} className={active ? 'text-white' : 'text-surface-300'} />
+                        ${active ? 'bg-indigo-100' : 'bg-paper-100'}`}>
+                        <Icon size={20} className={active ? 'text-paper-900' : 'text-paper-500'} />
                       </div>
                       <div>
                         <div className="font-bold text-base">{opt.label}</div>
-                        <div className="text-surface-300 text-sm mt-0.5">
+                        <div className="text-paper-500 text-sm mt-0.5">
                           {opt.description} ｜ {opt.timeRange}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className={`font-bold text-base ${opt.surcharge === 0 ? 'text-white' : 'text-white'}`}>
+                      <div className={`font-bold text-base ${opt.surcharge === 0 ? 'text-paper-900' : 'text-paper-900'}`}>
                         {opt.surcharge === 0 ? '+NT$0' : `+NT$${opt.surcharge}`}
                       </div>
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                        ${active ? 'border-white bg-white' : 'border-surface-500'}`}>
+                        ${active ? 'border-paper-900 bg-paper-900' : 'border-paper-300'}`}>
                         {active && <Check size={12} className="text-white" />}
                       </div>
                     </div>
@@ -294,7 +293,7 @@ export default function CreateOrder() {
               )
             })}
             <div className="card flex items-center justify-between mt-2">
-              <div className="text-surface-300 text-sm">距離約 9.2 公里 · 預估 34 分鐘</div>
+              <div className="text-paper-500 text-sm">距離約 9.2 公里 · 預估 34 分鐘</div>
             </div>
             <button onClick={() => setStep('confirm')} className="btn-primary w-full">
               下一步：確認訂單 <ChevronRight size={16} />
@@ -315,13 +314,13 @@ export default function CreateOrder() {
                   month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 })} />
               )}
-              <div className="h-px bg-surface-600" />
+              <div className="h-px bg-paper-100" />
               <Row label="取件地址" value={form.pickupAddress} />
               <Row label="取件電話" value={form.pickupPhone} />
-              <div className="h-px bg-surface-600" />
+              <div className="h-px bg-paper-100" />
               <Row label="送達地址" value={form.deliveryAddress} />
               <Row label="收件電話" value={form.deliveryPhone} />
-              <div className="h-px bg-surface-600" />
+              <div className="h-px bg-paper-100" />
               <Row label="物品內容" value={form.itemContent} />
               {form.itemNote && <Row label="備註" value={form.itemNote} />}
             </div>
@@ -329,60 +328,60 @@ export default function CreateOrder() {
             {/* Promo code */}
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
-                <Tag size={14} className="text-white" />
+                <Tag size={14} className="text-paper-900" />
                 <span className="font-semibold text-sm">折扣碼</span>
               </div>
               {promoApplied ? (
-                <div className="flex items-center justify-between bg-white/8 border border-white/20
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200
                                 rounded-xl px-3 py-2.5">
                   <div className="flex items-center gap-2">
-                    <Check size={14} className="text-white" />
-                    <span className="text-white font-semibold text-sm">{promoApplied}</span>
-                    <span className="text-gray-300 text-sm">折抵 NT${discount}</span>
+                    <Check size={14} className="text-emerald-600" />
+                    <span className="text-emerald-700 font-semibold text-sm">{promoApplied}</span>
+                    <span className="text-paper-500 text-sm">折抵 NT${discount}</span>
                   </div>
                   <button onClick={() => { setPromoApplied(null); setPromoInput('') }}
-                    className="text-surface-400 hover:text-white"><X size={14} /></button>
+                    className="text-paper-500 hover:text-paper-900"><X size={14} /></button>
                 </div>
               ) : (
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 bg-surface-700 border border-surface-600 rounded-xl px-3 py-2.5
-                               text-sm text-white placeholder-surface-400 outline-none focus:border-white"
+                    className="flex-1 bg-white border border-paper-200 rounded-xl px-3 py-2.5
+                               text-sm text-paper-900 placeholder-paper-400 outline-none focus:border-paper-600"
                     placeholder="輸入折扣碼"
                     value={promoInput}
                     onChange={e => { setPromoInput(e.target.value); setPromoError('') }}
                     onKeyDown={e => e.key === 'Enter' && applyPromo()}
                   />
                   <button onClick={applyPromo}
-                    className="px-4 py-2.5 bg-surface-700 hover:bg-surface-600 border border-surface-600
+                    className="px-4 py-2.5 bg-white hover:bg-paper-100 border border-paper-200
                                rounded-xl text-sm font-medium transition-colors">
                     套用
                   </button>
                 </div>
               )}
               {promoError && <div className="text-red-400 text-xs mt-1.5">{promoError}</div>}
-              <div className="text-surface-500 text-xs mt-2">試試看：UFLY50 / NEW100 / VIP200</div>
+              <div className="text-paper-400 text-xs mt-2">試試看：UFLY50 / NEW100 / VIP200</div>
             </div>
 
             {/* Fee breakdown */}
             <div className="card space-y-2">
-              <div className="font-semibold mb-3 text-xs text-surface-400 uppercase tracking-wider">費用明細</div>
+              <div className="font-semibold mb-3 text-xs text-paper-500 uppercase tracking-wider">費用明細</div>
               <Row label="基本費用"              value={`NT$${BASE_FEE}`} />
               <Row label={`${selected.label}加價`} value={selected.surcharge === 0 ? '免費' : `+NT$${selected.surcharge}`} />
               {discount > 0 && (
                 <Row label={`折扣碼 ${promoApplied}`} value={`-NT$${discount}`} />
               )}
-              <div className="h-px bg-surface-600 my-1" />
+              <div className="h-px bg-paper-100 my-1" />
               <div className="flex items-center justify-between">
                 <span className="font-bold">預估總金額</span>
                 <div className="text-right">
                   {discount > 0 && (
-                    <div className="text-surface-400 text-xs line-through">NT${BASE_FEE + selected.surcharge}</div>
+                    <div className="text-paper-500 text-xs line-through">NT${BASE_FEE + selected.surcharge}</div>
                   )}
-                  <span className="font-black text-xl text-white">NT${total}</span>
+                  <span className="font-black text-xl text-paper-900">NT${total}</span>
                 </div>
               </div>
-              <div className="text-surface-400 text-xs">實際費用依距離計算，送達後結算</div>
+              <div className="text-paper-500 text-xs">實際費用依距離計算，送達後結算</div>
             </div>
 
             <button onClick={handleSubmit} className="btn-primary w-full text-base py-4">
@@ -398,7 +397,7 @@ export default function CreateOrder() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-surface-300 text-sm flex-shrink-0">{label}</span>
+      <span className="text-paper-500 text-sm flex-shrink-0">{label}</span>
       <span className="text-sm font-medium text-right">{value}</span>
     </div>
   )

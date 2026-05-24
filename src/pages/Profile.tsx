@@ -43,17 +43,17 @@ export default function Profile() {
       <div className="card mb-6">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
-              <User size={28} className="text-white" />
+            <div className="w-16 h-16 bg-paper-100 rounded-2xl flex items-center justify-center">
+              <User size={28} className="text-paper-900" />
             </div>
             <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full
                                flex items-center justify-center">
-              <Edit2 size={11} className="text-white" />
+              <Edit2 size={11} className="text-paper-900" />
             </button>
           </div>
           <div className="flex-1">
             <div className="font-bold text-lg">林雅文</div>
-            <div className="text-surface-300 text-sm flex items-center gap-1 mt-0.5">
+            <div className="text-paper-500 text-sm flex items-center gap-1 mt-0.5">
               <Phone size={12} /> 0912-345-678
             </div>
           </div>
@@ -61,28 +61,28 @@ export default function Profile() {
             <div className="flex items-center gap-1 text-yellow-400 font-semibold">
               <Star size={14} className="fill-yellow-400" /> 4.9
             </div>
-            <div className="text-surface-400 text-xs mt-0.5">會員評分</div>
+            <div className="text-paper-500 text-xs mt-0.5">會員評分</div>
           </div>
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-surface-600">
+        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-paper-200">
           {[
             { label: '總訂單',   value: '23',       icon: Package },
             { label: '累計消費', value: 'NT$3,420', icon: TrendingUp },
             { label: '完成率',   value: '100%',     icon: Check },
           ].map(s => (
             <div key={s.label} className="text-center">
-              <s.icon size={16} className="text-white mx-auto mb-1" />
+              <s.icon size={16} className="text-paper-900 mx-auto mb-1" />
               <div className="font-bold text-sm">{s.value}</div>
-              <div className="text-surface-400 text-xs">{s.label}</div>
+              <div className="text-paper-500 text-xs">{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-800 rounded-2xl p-1 mb-5">
+      <div className="flex gap-1 bg-paper-100 rounded-2xl p-1 mb-5">
         {[
           { id: 'profile' as const,   label: '帳號設定' },
           { id: 'addresses' as const, label: '常用地址' },
@@ -91,7 +91,7 @@ export default function Profile() {
           <button key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors
-              ${activeTab === t.id ? 'bg-surface-600 text-white' : 'text-surface-300 hover:text-white'}`}>
+              ${activeTab === t.id ? 'bg-white text-paper-900 shadow-sm' : 'text-paper-500 hover:text-paper-900'}`}>
             {t.label}
           </button>
         ))}
@@ -107,14 +107,14 @@ export default function Profile() {
               { icon: Shield, label: '實名驗證', value: '已驗證' },
             ].map(r => (
               <div key={r.label}
-                className="flex items-center justify-between py-2.5 border-b border-surface-600 last:border-0">
-                <div className="flex items-center gap-3 text-surface-300">
+                className="flex items-center justify-between py-2.5 border-b border-paper-200 last:border-0">
+                <div className="flex items-center gap-3 text-paper-500">
                   <r.icon size={16} />
                   <span className="text-sm">{r.label}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium">
                   {r.value}
-                  <ChevronRight size={14} className="text-surface-500" />
+                  <ChevronRight size={14} className="text-paper-400" />
                 </div>
               </div>
             ))}
@@ -126,13 +126,13 @@ export default function Profile() {
               { icon: Shield, label: '隱私設定',  value: '' },
             ].map(r => (
               <div key={r.label}
-                className="flex items-center justify-between py-2.5 border-b border-surface-600 last:border-0">
-                <div className="flex items-center gap-3 text-surface-300">
+                className="flex items-center justify-between py-2.5 border-b border-paper-200 last:border-0">
+                <div className="flex items-center gap-3 text-paper-500">
                   <r.icon size={16} />
                   <span className="text-sm">{r.label}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm font-medium text-surface-300">
-                  {r.value} <ChevronRight size={14} className="text-surface-500" />
+                <div className="flex items-center gap-2 text-sm font-medium text-paper-500">
+                  {r.value} <ChevronRight size={14} className="text-paper-400" />
                 </div>
               </div>
             ))}
@@ -141,11 +141,11 @@ export default function Profile() {
           {/* Demo: trigger rating */}
           <button onClick={() => setRatingOpen(true)}
             className="card-hover w-full flex items-center justify-between">
-            <div className="flex items-center gap-3 text-surface-300">
+            <div className="flex items-center gap-3 text-paper-500">
               <Star size={16} />
               <span className="text-sm">評價最近訂單（示範）</span>
             </div>
-            <ChevronRight size={14} className="text-surface-500" />
+            <ChevronRight size={14} className="text-paper-400" />
           </button>
 
           <button className="w-full flex items-center justify-center gap-2 py-3 text-red-400
@@ -165,8 +165,8 @@ export default function Profile() {
                 {editingAddr === addr.id ? (
                   <div className="space-y-3">
                     <input
-                      className="w-full bg-surface-600 border border-surface-500 rounded-xl px-3 py-2.5
-                                 text-sm text-white outline-none focus:border-white"
+                      className="w-full bg-paper-100 border border-paper-300 rounded-xl px-3 py-2.5
+                                 text-sm text-paper-900 outline-none focus:border-paper-600"
                       defaultValue={addr.address}
                     />
                     <div className="flex gap-2">
@@ -178,20 +178,20 @@ export default function Profile() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-surface-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Icon size={18} className="text-white" />
+                    <div className="w-10 h-10 bg-paper-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Icon size={18} className="text-paper-900" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm">{addr.label}</div>
-                      <div className="text-surface-300 text-xs truncate mt-0.5">{addr.address}</div>
+                      <div className="text-paper-500 text-xs truncate mt-0.5">{addr.address}</div>
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => setEditingAddr(addr.id)}
-                        className="p-2 rounded-xl hover:bg-surface-600 text-surface-400 hover:text-white transition-colors">
+                        className="p-2 rounded-xl hover:bg-paper-100 text-paper-500 hover:text-paper-900 transition-colors">
                         <Edit2 size={14} />
                       </button>
                       <button onClick={() => deleteAddress(addr.id)}
-                        className="p-2 rounded-xl hover:bg-red-500/10 text-surface-400 hover:text-red-400 transition-colors">
+                        className="p-2 rounded-xl hover:bg-red-500/10 text-paper-500 hover:text-red-400 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -206,8 +206,8 @@ export default function Profile() {
             <div className="card space-y-3">
               <div className="text-sm font-semibold">新增地址</div>
               <input
-                className="w-full bg-surface-600 border border-surface-500 rounded-xl px-3 py-2.5
-                           text-sm text-white outline-none focus:border-white placeholder-surface-400"
+                className="w-full bg-paper-100 border border-paper-300 rounded-xl px-3 py-2.5
+                           text-sm text-paper-900 outline-none focus:border-paper-600 placeholder-paper-400"
                 placeholder="輸入地址"
                 value={newAddrInput}
                 onChange={e => setNewAddrInput(e.target.value)}
@@ -232,10 +232,10 @@ export default function Profile() {
           ) : (
             <button onClick={() => setAddingAddr(true)}
               className="card-hover w-full flex items-center gap-3">
-              <div className="w-10 h-10 bg-surface-600 rounded-xl flex items-center justify-center">
-                <Plus size={18} className="text-white" />
+              <div className="w-10 h-10 bg-paper-100 rounded-xl flex items-center justify-center">
+                <Plus size={18} className="text-paper-900" />
               </div>
-              <span className="text-sm font-medium text-white">新增常用地址</span>
+              <span className="text-sm font-medium text-paper-900">新增常用地址</span>
             </button>
           )}
         </div>
@@ -246,8 +246,8 @@ export default function Profile() {
         <div className="space-y-3 animate-fade-in">
           {PAYMENT_METHODS.map(pm => (
             <div key={pm.id} className="card flex items-center gap-3">
-              <div className="w-10 h-10 bg-surface-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CreditCard size={18} className="text-white" />
+              <div className="w-10 h-10 bg-paper-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CreditCard size={18} className="text-paper-900" />
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-sm">{pm.brand} •••• {pm.last4}</div>
@@ -255,19 +255,19 @@ export default function Profile() {
                   <span className="badge-green text-xs mt-0.5">預設付款</span>
                 )}
               </div>
-              <ChevronRight size={16} className="text-surface-500" />
+              <ChevronRight size={16} className="text-paper-400" />
             </div>
           ))}
 
           <button className="card-hover w-full flex items-center gap-3">
-            <div className="w-10 h-10 bg-surface-600 rounded-xl flex items-center justify-center">
-              <Plus size={18} className="text-white" />
+            <div className="w-10 h-10 bg-paper-100 rounded-xl flex items-center justify-center">
+              <Plus size={18} className="text-paper-900" />
             </div>
-            <span className="text-sm font-medium text-white">新增付款方式</span>
+            <span className="text-sm font-medium text-paper-900">新增付款方式</span>
           </button>
 
-          <div className="card bg-surface-700/50">
-            <div className="text-xs text-surface-400 leading-relaxed">
+          <div className="card bg-white/50">
+            <div className="text-xs text-paper-500 leading-relaxed">
               所有交易均採用 TLS 加密，信用卡資訊安全儲存。
               目前支援 Visa、Mastercard、LINE Pay、街口支付。
             </div>

@@ -4,174 +4,178 @@ import {
   FileText, Package, ShoppingBag, ClipboardList,
   Briefcase, Star, Key, Receipt, Gift, MapPin,
   ArrowRight, ChevronRight, Clock, Shield, Users,
-  Truck, Zap,
+  Truck, Zap, Search, Home as HomeIcon, CalendarClock,
 } from 'lucide-react'
 
-const SERVICE_TABS = [
-  { id: 'send',    label: '幫我送' },
-  { id: 'fetch',   label: '幫我取' },
-  { id: 'support', label: '任務支援' },
-  { id: 'queue',   label: '幫排隊' },
-]
+const SERVICE_TABS = ['幫我送', '幫我取', '任務支援', '幫排隊']
 
 const SERVICES = [
-  { id: 'document',   icon: FileText,      label: '文件急送', featured: true },
-  { id: 'delivery',   icon: Package,       label: '物品配送' },
-  { id: 'business',   icon: Briefcase,     label: '商務支援' },
-  { id: 'urgent',     icon: Zap,           label: '急件配送' },
-  { id: 'key',        icon: Key,           label: '鑰匙急送' },
-  { id: 'ticket',     icon: Receipt,       label: '票券文件' },
-  { id: 'gift',       icon: Gift,          label: '禮品配送' },
-  { id: 'designated', icon: MapPin,        label: '指定送達' },
-  { id: 'purchase',   icon: ShoppingBag,   label: '即時代購' },
-  { id: 'errand',     icon: ClipboardList, label: '即時代辦' },
-  { id: 'custom',     icon: Star,          label: '客製任務' },
+  { id: 'document',   icon: FileText,      label: '文件急送', iconBg: '#EEF2FF', iconColor: '#4F46E5' },
+  { id: 'delivery',   icon: Package,       label: '物品配送', iconBg: '#FFF7ED', iconColor: '#EA580C' },
+  { id: 'business',   icon: Briefcase,     label: '商務急件', iconBg: '#EFF6FF', iconColor: '#2563EB' },
+  { id: 'urgent',     icon: Zap,           label: '急件配送', iconBg: '#FFF1F2', iconColor: '#E11D48' },
+  { id: 'key',        icon: Key,           label: '鑰匙急送', iconBg: '#FFFBEB', iconColor: '#D97706' },
+  { id: 'ticket',     icon: Receipt,       label: '票券文件', iconBg: '#F0FDF4', iconColor: '#15803D' },
+  { id: 'gift',       icon: Gift,          label: '禮品配送', iconBg: '#FDF4FF', iconColor: '#C026D3' },
+  { id: 'purchase',   icon: ShoppingBag,   label: '即時代購', iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  { id: 'errand',     icon: ClipboardList, label: '即時代辦', iconBg: '#FAF5FF', iconColor: '#9333EA' },
+  { id: 'designated', icon: MapPin,        label: '指定送達', iconBg: '#EFF6FF', iconColor: '#0EA5E9' },
+  { id: 'custom',     icon: Star,          label: '客製任務', iconBg: '#FFF7ED', iconColor: '#F97316' },
 ]
 
-const FEATURES = [
-  { icon: Users,  label: '專人服務', desc: '真人接單，全程追蹤' },
-  { icon: Clock,  label: '快速媒合', desc: '最快 20 分鐘完成任務' },
-  { icon: Shield, label: '安全可靠', desc: '實名驗證，保障安心' },
-  { icon: Truck,  label: '彈性配送', desc: '台中全區，豐原起步' },
+const SAVED_PLACES = [
+  { icon: HomeIcon,    label: '家',   address: '豐原區中正路100號' },
+  { icon: Briefcase,   label: '公司', address: '西屯區台灣大道三段' },
+]
+
+const PROMOS = [
+  { tag: '限時優惠', title: '首次下單享 NT$50 折扣',    desc: '輸入 NEW100 折扣碼',       color: 'from-indigo-500 to-purple-600' },
+  { tag: '會員方案', title: '升級 Ufly Pro 享無限優惠', desc: '每月固定費，無限次下單',    color: 'from-amber-500 to-orange-600' },
+  { tag: '推薦好友', title: '邀請好友各得 NT$100',      desc: '分享連結即可獲得優惠',      color: 'from-emerald-500 to-teal-600' },
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('send')
+  const [activeTab, setActiveTab] = useState(0)
+  const [search, setSearch]       = useState('')
 
   return (
     <div className="animate-fade-in">
-      {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-8 pb-10 md:px-8 md:pt-16 md:pb-20">
-        <div className="absolute inset-0 bg-gradient-to-b from-surface-800/60 to-surface-900 pointer-events-none" />
+      {/* Dark hero */}
+      <section className="bg-paper-900 px-4 pt-6 pb-8 md:px-8">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-3xl md:text-4xl font-black text-paper-900 mb-1">
+            今天需要 Ufly<br />幫你處理什麼？
+          </h1>
+          <p className="text-paper-400 text-sm mb-5">快速下單 · 專人完成 · 安全可靠</p>
 
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-            <div className="flex-1">
-              <h1 className="text-4xl md:text-5xl font-black leading-tight mb-3">
-                今天需要 Ufly<br />
-                <span className="text-white">幫你處理什麼？</span>
-              </h1>
-              <p className="text-surface-200 text-base md:text-lg mb-6 leading-relaxed">
-                快速下單 · 專人完成 · 安全可靠
-              </p>
-              <div className="flex gap-3 flex-wrap">
-                <Link to="/order" className="btn-primary">
-                  立即下單 <ArrowRight size={16} />
-                </Link>
-                <Link to="/tracking" className="btn-secondary">
-                  追蹤訂單
-                </Link>
-              </div>
+          {/* Search bar */}
+          <div className="relative mb-3">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-paper-500" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="輸入取件或送達地址…"
+              className="w-full bg-white rounded-2xl pl-11 pr-4 py-3.5 text-sm text-paper-900
+                         placeholder-paper-400 outline-none shadow-card-lg"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-paper-200 rounded-xl px-2 py-1 text-xs text-paper-600">
+              稍後
             </div>
+          </div>
 
-            {/* Hero visual */}
-            <div className="hidden md:flex flex-shrink-0 w-72 h-72 items-center justify-center
-                            bg-surface-700 rounded-3xl border border-surface-600 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
-              <div className="relative flex flex-col items-center gap-4">
-                <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center border border-white/20">
-                  <Zap size={48} className="text-white" />
+          {/* Saved places */}
+          <div className="flex flex-col gap-1">
+            {SAVED_PLACES.map(p => (
+              <Link key={p.label} to={`/order?dest=${encodeURIComponent(p.address)}`}
+                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 rounded-2xl px-4 py-3 transition-colors">
+                <div className="w-8 h-8 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <p.icon size={15} className="text-paper-900" />
                 </div>
-                <div className="text-center">
-                  <div className="text-white font-bold text-lg">城市任務平台</div>
-                  <div className="text-surface-300 text-sm">City Task Platform</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-paper-900 text-sm font-medium">{p.label}</div>
+                  <div className="text-paper-400 text-xs truncate">{p.address}</div>
                 </div>
-              </div>
-            </div>
+                <ChevronRight size={14} className="text-paper-500" />
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Service tabs */}
-      <section className="px-4 md:px-8 max-w-5xl mx-auto">
-        <div className="card p-2 flex gap-1">
-          {SERVICE_TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`flex-1 py-3 px-2 rounded-2xl text-sm font-semibold transition-all duration-200
-                ${activeTab === t.id
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-surface-200 hover:text-white hover:bg-surface-600'}`}
-            >
-              {t.label}
+      <section className="bg-white border-b border-paper-200 sticky top-14 md:top-16 z-30">
+        <div className="max-w-3xl mx-auto px-4 md:px-8 flex gap-0 overflow-x-auto">
+          {SERVICE_TABS.map((t, i) => (
+            <button key={t} onClick={() => setActiveTab(i)}
+              className={`px-5 py-4 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors flex-shrink-0
+                ${activeTab === i
+                  ? 'border-paper-900 text-paper-900'
+                  : 'border-transparent text-paper-500 hover:text-paper-800'}`}>
+              {t}
             </button>
           ))}
         </div>
       </section>
 
-      {/* Service grid */}
-      <section className="px-4 md:px-8 max-w-5xl mx-auto mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">常用服務</h2>
-          <Link to="/order" className="text-white/60 text-sm flex items-center gap-1 hover:text-white">
-            全部服務 <ChevronRight size={14} />
-          </Link>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 md:px-8">
 
-        <div className="grid grid-cols-4 gap-3 md:grid-cols-6 lg:grid-cols-8">
-          {SERVICES.slice(0, 8).map(({ id, icon: Icon, label, featured }) => (
-            <Link
-              key={id}
-              to={`/order?service=${id}`}
-              className={`flex flex-col items-center gap-2.5 p-3 rounded-2xl transition-all duration-200
-                          hover:scale-105 active:scale-95
-                          ${featured
-                            ? 'bg-white text-black border-2 border-white'
-                            : 'bg-surface-700 border border-surface-600 text-surface-200 hover:text-white hover:bg-surface-600'}`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center
-                              ${featured ? 'bg-black/10' : 'bg-surface-600'}`}>
-                <Icon size={20} className={featured ? 'text-black' : 'text-white'} />
-              </div>
-              <span className="text-xs font-semibold text-center leading-tight">{label}</span>
+        {/* Service grid */}
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-paper-900">善待自己</h2>
+            <Link to="/order" className="text-paper-600 text-xs flex items-center gap-1 hover:text-paper-900">
+              查看全部 <ChevronRight size={12} />
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      {/* Features */}
-      <section className="px-4 md:px-8 max-w-5xl mx-auto mt-10 mb-6">
-        <h2 className="text-lg font-bold mb-4">為什麼選擇 Ufly</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {FEATURES.map(({ icon: Icon, label, desc }) => (
-            <div key={label} className="card flex flex-col gap-3">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10">
-                <Icon size={20} className="text-white" />
+          <div className="grid grid-cols-4 gap-3 md:grid-cols-6">
+            {SERVICES.slice(0, activeTab === 0 ? 8 : 6).map(({ id, icon: Icon, label, iconBg, iconColor }) => (
+              <Link key={id} to={`/order?service=${id}`}
+                className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-paper-200
+                           hover:shadow-card-lg hover:border-paper-300 transition-all duration-200 active:scale-95">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  style={{ backgroundColor: iconBg }}>
+                  <Icon size={22} style={{ color: iconColor }} />
+                </div>
+                <span className="text-xs font-medium text-paper-800 text-center leading-tight">{label}</span>
+              </Link>
+            ))}
+            {/* 預約 card */}
+            <Link to="/order" className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl
+                                          border border-paper-200 hover:shadow-card-lg transition-all duration-200 active:scale-95">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gray-100">
+                <CalendarClock size={22} className="text-gray-600" />
               </div>
-              <div>
-                <div className="font-semibold text-sm">{label}</div>
-                <div className="text-surface-300 text-xs mt-0.5">{desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+              <span className="text-xs font-medium text-paper-800 text-center leading-tight">預約下單</span>
+            </Link>
+          </div>
+        </section>
 
-      {/* Stats strip */}
-      <section className="px-4 md:px-8 max-w-5xl mx-auto mt-4 mb-8">
-        <div className="bg-surface-700 border border-surface-600 rounded-3xl p-5
-                        flex items-center justify-between gap-4">
-          <div>
-            <div className="text-white/50 text-xs font-semibold mb-1">今日任務</div>
-            <div className="text-2xl font-black">47 <span className="text-surface-300 text-base font-medium">筆完成</span></div>
-            <div className="text-surface-300 text-xs mt-1">完成率 96.8%</div>
+        {/* Promo banners */}
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-paper-900">優惠活動</h2>
           </div>
-          <div className="hidden sm:block h-12 w-px bg-surface-600" />
-          <div className="hidden sm:block">
-            <div className="text-white/50 text-xs font-semibold mb-1">平均送達</div>
-            <div className="text-2xl font-black">38 <span className="text-surface-300 text-base font-medium">分鐘</span></div>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+            {PROMOS.map(p => (
+              <div key={p.title}
+                className={`flex-shrink-0 w-64 rounded-2xl bg-gradient-to-br ${p.color} p-4 text-paper-900`}>
+                <span className="badge bg-white/20 text-paper-900 text-[10px] mb-2">{p.tag}</span>
+                <div className="font-bold text-sm leading-snug mb-1">{p.title}</div>
+                <div className="text-paper-900/75 text-xs">{p.desc}</div>
+                <button className="mt-3 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors">
+                  查看優惠內容 →
+                </button>
+              </div>
+            ))}
           </div>
-          <div className="hidden sm:block h-12 w-px bg-surface-600" />
-          <div className="hidden sm:block">
-            <div className="text-white/50 text-xs font-semibold mb-1">在線夥伴</div>
-            <div className="text-2xl font-black">12 <span className="text-surface-300 text-base font-medium">人</span></div>
+        </section>
+
+        {/* Features */}
+        <section className="mt-6 mb-8">
+          <h2 className="text-base font-bold text-paper-900 mb-3">為什麼選擇 Ufly</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: Users,  label: '專人服務', desc: '真人接單，全程追蹤', bg: '#EEF2FF', color: '#4F46E5' },
+              { icon: Clock,  label: '快速媒合', desc: '最快 20 分鐘完成',   bg: '#FFF7ED', color: '#EA580C' },
+              { icon: Shield, label: '安全可靠', desc: '實名驗證，保障安心', bg: '#F0FDF4', color: '#16A34A' },
+              { icon: Truck,  label: '彈性配送', desc: '台中全區服務',       bg: '#EFF6FF', color: '#2563EB' },
+            ].map(f => (
+              <div key={f.label} className="bg-white rounded-2xl p-4 border border-paper-200 shadow-card flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: f.bg }}>
+                  <f.icon size={18} style={{ color: f.color }} />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm text-paper-900">{f.label}</div>
+                  <div className="text-paper-500 text-xs mt-0.5">{f.desc}</div>
+                </div>
+              </div>
+            ))}
           </div>
-          <Link to="/order" className="flex-shrink-0 btn-primary py-2.5 text-sm">
-            立即下單 <ArrowRight size={14} />
-          </Link>
-        </div>
-      </section>
+        </section>
+
+      </div>
     </div>
   )
 }

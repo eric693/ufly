@@ -25,10 +25,10 @@ const ICONS = {
   driver:  Navigation,
 }
 const COLORS = {
-  success: 'text-white bg-white/8',
-  info:    'text-blue-400 bg-blue-400/10',
-  warning: 'text-yellow-400 bg-yellow-400/10',
-  driver:  'text-purple-400 bg-purple-400/10',
+  success: 'text-emerald-600 bg-emerald-50',
+  info:    'text-blue-500 bg-blue-50',
+  warning: 'text-amber-500 bg-amber-50',
+  driver:  'text-indigo-500 bg-indigo-50',
 }
 
 interface Props {
@@ -53,51 +53,51 @@ export default function NotificationPanel({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60]">
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/20" />
       <div ref={ref}
-        className="absolute top-16 right-4 md:right-6 w-80 md:w-96 bg-surface-800 border border-surface-600
-                   rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+        className="absolute top-16 right-4 md:right-6 w-80 md:w-96 bg-white border border-paper-200
+                   rounded-2xl shadow-card-xl overflow-hidden animate-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-700">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-paper-200">
           <div className="flex items-center gap-2">
-            <Bell size={16} className="text-white" />
-            <span className="font-bold text-sm">通知中心</span>
+            <Bell size={16} className="text-paper-900" />
+            <span className="font-bold text-sm text-paper-900">通知中心</span>
             {unread > 0 && (
-              <span className="bg-white text-black text-xs font-bold px-1.5 py-0.5 rounded-full">{unread}</span>
+              <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{unread}</span>
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button className="text-white text-xs hover:text-gray-300">全部已讀</button>
-            <button onClick={onClose} className="text-surface-400 hover:text-white"><X size={16} /></button>
+            <button className="text-paper-500 text-xs hover:text-paper-900 transition-colors">全部已讀</button>
+            <button onClick={onClose} className="text-paper-400 hover:text-paper-900 transition-colors"><X size={16} /></button>
           </div>
         </div>
 
         {/* List */}
-        <div className="max-h-96 overflow-y-auto divide-y divide-surface-700">
+        <div className="max-h-96 overflow-y-auto divide-y divide-paper-100">
           {NOTIFICATIONS.map(n => {
             const Icon = ICONS[n.type]
             return (
               <div key={n.id}
-                className={`flex items-start gap-3 px-4 py-3.5 hover:bg-surface-700/50 transition-colors cursor-pointer
-                  ${!n.read ? 'bg-surface-700/20' : ''}`}>
+                className={`flex items-start gap-3 px-4 py-3.5 hover:bg-paper-50 transition-colors cursor-pointer
+                  ${!n.read ? 'bg-paper-50' : 'bg-white'}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${COLORS[n.type]}`}>
                   <Icon size={15} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <span className={`text-sm font-semibold ${!n.read ? 'text-white' : 'text-surface-200'}`}>{n.title}</span>
-                    {!n.read && <div className="w-1.5 h-1.5 bg-white rounded-full flex-shrink-0 mt-1.5" />}
+                    <span className={`text-sm font-semibold ${!n.read ? 'text-paper-900' : 'text-paper-700'}`}>{n.title}</span>
+                    {!n.read && <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0 mt-1.5" />}
                   </div>
-                  <div className="text-surface-400 text-xs mt-0.5 leading-relaxed">{n.body}</div>
-                  <div className="text-surface-500 text-xs mt-1">{n.time}</div>
+                  <div className="text-paper-500 text-xs mt-0.5 leading-relaxed">{n.body}</div>
+                  <div className="text-paper-400 text-xs mt-1">{n.time}</div>
                 </div>
               </div>
             )
           })}
         </div>
 
-        <div className="px-4 py-3 border-t border-surface-700 text-center">
-          <button className="text-white text-sm hover:text-gray-300">查看全部通知</button>
+        <div className="px-4 py-3 border-t border-paper-200 text-center">
+          <button className="text-paper-600 text-sm hover:text-paper-900 transition-colors">查看全部通知</button>
         </div>
       </div>
     </div>
