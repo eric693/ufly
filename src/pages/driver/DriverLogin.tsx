@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Phone, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../lib/api'
+import { reconnectSocket } from '../../lib/socket'
 import Logo from '../../components/Logo'
 
 export default function DriverLogin() {
@@ -20,6 +21,7 @@ export default function DriverLogin() {
     try {
       const { data } = await api.post('/auth/driver', { phone: phone.trim() })
       await login(data.token)
+      reconnectSocket()
       navigate('/driver', { replace: true })
     } catch (err: any) {
       setError(err?.response?.data?.error || '登入失敗，請確認電話號碼')

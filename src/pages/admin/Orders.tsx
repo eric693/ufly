@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, SlidersHorizontal, Download, Eye, MapPin, Clock, Package, Loader2 } from 'lucide-react'
+import { Search, SlidersHorizontal, Download, Eye, MapPin, Clock, Package, Loader2, AlertCircle } from 'lucide-react'
 import api from '../../lib/api'
 import type { OrderStatus } from '../../types'
 
@@ -21,14 +21,18 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AdminOrders() {
   const [orders, setOrders]     = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
   const [filter, setFilter]     = useState<OrderStatus | 'all'>('all')
   const [search, setSearch]     = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [updating, setUpdating] = useState<string | null>(null)
 
   const fetch = () => {
-    setLoading(true)
-    api.get('/admin/orders?limit=100').then(r => setOrders(r.data.orders || [])).catch(() => {}).finally(() => setLoading(false))
+    setLoading(true); setError('')
+    api.get('/admin/orders?limit=100')
+      .then(r => setOrders(r.data.orders || []))
+      .catch((e: any) => setError(e?.response?.data?.error || '載入失敗，請重試'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { fetch() }, [])
@@ -46,11 +50,18 @@ export default function AdminOrders() {
     try {
       await api.put(`/admin/orders/${id}/status`, { status })
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
-    } catch { /* ignore */ } finally { setUpdating(null) }
+    } catch (e: any) {
+      alert(e?.response?.data?.error || '更新失敗')
+    } finally { setUpdating(null) }
   }
 
   return (
     <div className="animate-fade-in space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+          <AlertCircle size={15} className="flex-shrink-0" /> {error}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">訂單管理</h1>
         <button onClick={fetch} className="flex items-center gap-2 bg-surface-800 border border-surface-700 rounded-xl px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors">

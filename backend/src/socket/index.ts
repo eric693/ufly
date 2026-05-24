@@ -40,16 +40,12 @@ export function setupSocketIO(io: Server) {
     })
   })
 
-  // Broadcast driver positions to admin every 5s
+  // Broadcast real driver positions to admin every 5s
   setInterval(async () => {
     const drivers = await prisma.driver.findMany({
       where: { status: { not: 'offline' } },
       select: { id: true, name: true, status: true, area: true, lat: true, lng: true, rating: true },
     })
-    io.to('admin').emit('drivers:positions', drivers.map(d => ({
-      ...d,
-      lat: d.lat + (Math.random() - 0.5) * 0.003,
-      lng: d.lng + (Math.random() - 0.5) * 0.003,
-    })))
+    io.to('admin').emit('drivers:positions', drivers)
   }, 5000)
 }

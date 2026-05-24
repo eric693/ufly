@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Phone, Star, MapPin, TrendingUp, Loader2, X, Trash2, Edit2, Check } from 'lucide-react'
+import { Search, Plus, Phone, Star, MapPin, TrendingUp, Loader2, X, Trash2, Edit2, Check, AlertCircle } from 'lucide-react'
 import api from '../../lib/api'
 
 const STATUS_LABEL: Record<string, string> = { online: '在線', busy: '任務中', offline: '離線' }
@@ -13,6 +13,7 @@ const EMPTY_FORM: DriverForm = { name: '', phone: '', area: '', email: '' }
 export default function AdminDrivers() {
   const [drivers, setDrivers]   = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<'all' | 'online' | 'busy' | 'offline'>('all')
   const [updating, setUpdating] = useState<string | null>(null)
@@ -25,8 +26,11 @@ export default function AdminDrivers() {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = () => {
-    setLoading(true)
-    api.get('/admin/drivers').then(r => setDrivers(r.data || [])).catch(() => {}).finally(() => setLoading(false))
+    setLoading(true); setError('')
+    api.get('/admin/drivers')
+      .then(r => setDrivers(r.data || []))
+      .catch((e: any) => setError(e?.response?.data?.error || '載入失敗，請重試'))
+      .finally(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
 
@@ -47,7 +51,9 @@ export default function AdminDrivers() {
     try {
       await api.put(`/admin/drivers/${id}/status`, { status })
       setDrivers(prev => prev.map(d => d.id === id ? { ...d, status } : d))
-    } catch { /* ignore */ } finally { setUpdating(null) }
+    } catch (e: any) {
+      alert(e?.response?.data?.error || '更新失敗')
+    } finally { setUpdating(null) }
   }
 
   const openAdd = () => { setForm(EMPTY_FORM); setModal('add') }
@@ -82,6 +88,11 @@ export default function AdminDrivers() {
 
   return (
     <div className="animate-fade-in space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+          <AlertCircle size={15} className="flex-shrink-0" /> {error}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">夥伴管理</h1>
         <button onClick={openAdd} className="btn-primary py-2 text-sm flex items-center gap-1.5">

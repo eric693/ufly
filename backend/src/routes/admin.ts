@@ -34,16 +34,17 @@ const router = Router()
 router.get('/stats', requireAdmin, async (_req, res) => {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
 
-  const [todayOrders, todayRevenueAgg, activeDrivers, pendingOrders, totalCompleted, totalNonPending] = await Promise.all([
+  const [todayOrders, todayRevenueAgg, activeDrivers, pendingOrders, totalCompleted, totalClosed] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
     prisma.order.aggregate({ where: { status: 'completed', createdAt: { gte: startOfDay } }, _sum: { totalFee: true } }),
     prisma.driver.count({ where: { status: { not: 'offline' } } }),
     prisma.order.count({ where: { status: { in: ['pending', 'matching'] } } }),
     prisma.order.count({ where: { status: 'completed' } }),
-    prisma.order.count({ where: { status: { not: 'pending' } } }),
+    prisma.order.count({ where: { status: { in: ['completed', 'cancelled'] } } }),
   ])
 
-  const completionRate = totalNonPending > 0 ? Math.round((totalCompleted / totalNonPending) * 1000) / 10 : 96.8
+  // completionRate = completed / (completed + cancelled), excludes in-progress orders
+  const completionRate = totalClosed > 0 ? Math.round((totalCompleted / totalClosed) * 1000) / 10 : 100
   res.json({ todayOrders, todayRevenue: todayRevenueAgg._sum.totalFee ?? 0, activeDrivers, pendingOrders, completionRate, avgDeliveryTime: 38 })
 })
 
@@ -87,7 +88,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
 // /drivers/positions must come before /drivers/:id
 router.get('/drivers/positions', requireAdmin, async (_req, res) => {
   const drivers = await prisma.driver.findMany({ where: { status: { not: 'offline' } }, select: { id: true, name: true, status: true, area: true, lat: true, lng: true, rating: true } })
-  res.json(drivers.map(d => ({ ...serializeDriver(d), lat: d.lat + (Math.random() - 0.5) * 0.003, lng: d.lng + (Math.random() - 0.5) * 0.003 })))
+  res.json(drivers.map(serializeDriver))
 })
 
 router.get('/drivers', requireAdmin, async (_req, res) => {
@@ -197,6 +198,37 @@ router.get('/analytics/services', requireAdmin, async (_req, res) => {
     count: g._count._all,
     pct: total > 0 ? Math.round(g._count._all / total * 100) : 0,
   })))
+})
+
+// ── Promo codes ──────────────────────────────────────────────────────────────
+router.get('/promos', requireAdmin, async (_req, res) => {
+  const promos = await prisma.promoCode.findMany({ orderBy: { createdAt: 'desc' } })
+  res.json(promos)
+})
+
+router.post('/promos', requireAdmin, async (req, res) => {
+  const { code, discount, usage_max } = req.body
+  if (!code || !discount) { res.status(400).json({ error: '請填寫優惠碼與折扣金額' }); return }
+  try {
+    const promo = await prisma.promoCode.create({
+      data: { id: require('crypto').randomUUID(), code: code.toUpperCase(), discount: Number(discount), usageMax: usage_max ? Number(usage_max) : null },
+    })
+    res.json(promo)
+  } catch { res.status(400).json({ error: '優惠碼已存在' }) }
+})
+
+router.put('/promos/:id', requireAdmin, async (req, res) => {
+  const { active, usage_max } = req.body
+  const promo = await prisma.promoCode.update({
+    where: { id: req.params.id },
+    data: { ...(active !== undefined ? { active } : {}), ...(usage_max !== undefined ? { usageMax: usage_max } : {}) },
+  })
+  res.json(promo)
+})
+
+router.delete('/promos/:id', requireAdmin, async (req, res) => {
+  await prisma.promoCode.delete({ where: { id: req.params.id } })
+  res.json({ ok: true })
 })
 
 router.get('/settings', requireAdmin, (_req, res) => {

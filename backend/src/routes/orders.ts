@@ -9,7 +9,6 @@ const router = Router()
 
 const SPEED_SURCHARGE: Record<string, number> = { standard: 0, express: 30, priority: 80, urgent: 150 }
 const SPEED_MINUTES:   Record<string, number> = { standard: 75, express: 52, priority: 37, urgent: 20 }
-const VALID_PROMOS:    Record<string, number> = { UFLY50: 50, NEW100: 100, VIP200: 200 }
 const BASE_FEE = 120
 const FEE_PER_KM = 12
 
@@ -58,7 +57,11 @@ router.delete('/recurring/:id', requireAuth, async (req: AuthRequest, res) => {
 router.post('/estimate', requireAuth, async (req: AuthRequest, res) => {
   const { speed_tier = 'standard', promo_code } = req.body
   const distance = estimateDistance()
-  const discount = VALID_PROMOS[promo_code?.toUpperCase()] ?? 0
+  let discount = 0
+  if (promo_code) {
+    const promo = await prisma.promoCode.findFirst({ where: { code: promo_code.toUpperCase(), active: true } })
+    if (promo && (!promo.usageMax || promo.usageCount < promo.usageMax)) discount = promo.discount
+  }
   res.json({ distance, ...calcFare(distance, speed_tier, discount), valid_promo: discount > 0 })
 })
 
@@ -79,7 +82,12 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   if (!pickup_address || !delivery_address) { res.status(400).json({ error: '請填寫地址' }); return }
 
   const distance = estimateDistance()
-  const discount = VALID_PROMOS[promo_code?.toUpperCase()] ?? 0
+  let discount = 0
+  let promoId: string | null = null
+  if (promo_code) {
+    const promo = await prisma.promoCode.findFirst({ where: { code: promo_code.toUpperCase(), active: true } })
+    if (promo && (!promo.usageMax || promo.usageCount < promo.usageMax)) { discount = promo.discount; promoId = promo.id }
+  }
   const fare = calcFare(distance, speed_tier, discount)
   const id = await nextOrderId()
 
@@ -100,6 +108,8 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     },
     include: { driver: true },
   })
+
+  if (promoId) await prisma.promoCode.update({ where: { id: promoId }, data: { usageCount: { increment: 1 } } })
 
   await notify(req.user!.id, 'info', '訂單已建立', `${id} — 正在媒合任務夥伴`)
 

@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import CustomerLayout from './layouts/CustomerLayout'
 import AdminLayout from './layouts/AdminLayout'
+import ErrorBoundary from './components/ErrorBoundary'
 
 import Home from './pages/Home'
 import CreateOrder from './pages/CreateOrder'
@@ -26,6 +27,7 @@ import LiveMap from './pages/admin/LiveMap'
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <Routes>
         <Route path="/login"          element={<Login />} />
@@ -58,5 +60,6 @@ export default function App() {
         </Route>
       </Routes>
     </AuthProvider>
+    </ErrorBoundary>
   )
 }

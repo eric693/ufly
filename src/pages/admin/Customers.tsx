@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Search, User, Phone, Clock, Package, Loader2, RefreshCw } from 'lucide-react'
+import { Search, User, Phone, Clock, Package, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import api from '../../lib/api'
 
 export default function AdminCustomers() {
   const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
   const [search, setSearch]       = useState('')
 
   const load = () => {
-    setLoading(true)
-    api.get('/admin/customers').then(r => setCustomers(r.data || [])).catch(() => {}).finally(() => setLoading(false))
+    setLoading(true); setError('')
+    api.get('/admin/customers')
+      .then(r => setCustomers(r.data || []))
+      .catch((e: any) => setError(e?.response?.data?.error || '載入失敗，請重試'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -23,6 +27,11 @@ export default function AdminCustomers() {
 
   return (
     <div className="animate-fade-in space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
+          <AlertCircle size={15} className="flex-shrink-0" /> {error}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">客戶管理</h1>
         <div className="flex items-center gap-3">
