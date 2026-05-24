@@ -38,7 +38,7 @@ router.put('/me', requireAuth, async (req: AuthRequest, res) => {
   const { name, phone } = req.body
   const user = await prisma.user.update({
     where: { id: req.user!.id },
-    data: { ...(name ? { name } : {}), ...(phone ? { phone } : {}) },
+    data: { ...(name ? { name } : {}), ...(phone !== undefined ? { phone: phone || null } : {}) },
   })
   res.json(serializeUser(user))
 })

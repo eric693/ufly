@@ -5,6 +5,7 @@ import path from 'path'
 import prisma from '../lib/prisma'
 import { requireAdmin } from '../middleware/requireAuth'
 import { serializeOrder, serializeDriver, serializeUser } from '../lib/serializer'
+import { sendLineMessage } from '../lib/lineMessaging'
 
 const SETTINGS_PATH = path.join(__dirname, '../../settings.json')
 const DEFAULT_SETTINGS = {
@@ -73,7 +74,11 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
   if (order.userId) {
     const msgs: Record<string, string> = { accepted: '已接單', pickup: '取件中', delivering: '配送中', completed: '已送達', cancelled: '已取消' }
     if (msgs[status]) {
-      await prisma.notification.create({ data: { id: uuidv4(), userId: order.userId, type: status === 'completed' ? 'success' : 'info', title: `訂單${msgs[status]}`, body: `${order.id} — ${msgs[status]}` } })
+      const title = `訂單${msgs[status]}`
+      const body = `${order.id} — ${msgs[status]}`
+      await prisma.notification.create({ data: { id: uuidv4(), userId: order.userId, type: status === 'completed' ? 'success' : 'info', title, body } })
+      const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { lineId: true } })
+      if (user?.lineId) await sendLineMessage(user.lineId, `【Ufly】${title}\n${body}`)
     }
   }
   res.json({ ok: true })

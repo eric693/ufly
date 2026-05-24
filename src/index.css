@@ -87,12 +87,20 @@
 
 .admin-sidebar { background: #0f1117; }
 
-/* Leaflet tiles must not be constrained by Tailwind's img reset */
+/* Leaflet: fix tile rendering on non-black backgrounds.
+   Leaflet 1.9 applies mix-blend-mode:plus-lighter on tiles to work around a
+   Chromium subpixel bug, but this makes tiles invisible on the default #ddd
+   container background (plus-lighter with grey = white). Override to normal. */
+.leaflet-container {
+  background: #000 !important;
+}
+.leaflet-container img.leaflet-tile {
+  mix-blend-mode: normal !important;
+}
+/* Prevent Tailwind img reset from constraining tile dimensions */
 .leaflet-container img {
   max-width: none !important;
   max-height: none !important;
-  width: auto;
-  display: block;
 }
 
 .status-online  { @apply w-2 h-2 rounded-full bg-brand-500 animate-pulse-soft; }

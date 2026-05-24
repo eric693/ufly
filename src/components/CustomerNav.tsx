@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, Bell, User, ChevronRight, LogOut } from 'lucide-react'
 import Logo from './Logo'
 import NotificationPanel from './NotificationPanel'
 import { useAuth } from '../contexts/AuthContext'
+import api from '../lib/api'
 
 export default function CustomerNav() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen,  setNotifOpen]  = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const { pathname } = useLocation()
   const { user, logout } = useAuth()
+
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return }
+    api.get('/users/me/notifications')
+      .then(r => setUnreadCount((r.data as any[]).filter((n: any) => !n.read).length))
+      .catch(() => {})
+  }, [user, notifOpen])
 
   const links = [
     { to: '/',         label: '首頁' },
@@ -39,7 +48,7 @@ export default function CustomerNav() {
           <button onClick={() => setNotifOpen(true)}
             className="p-2 rounded-xl text-paper-600 hover:bg-paper-100 transition-colors relative">
             <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />}
           </button>
           {user ? (
             <div className="flex items-center gap-2">
@@ -60,7 +69,9 @@ export default function CustomerNav() {
               登入
             </Link>
           )}
-          <Link to="/admin" className="btn-primary py-2 text-sm">後台 <ChevronRight size={14} /></Link>
+          {user?.role === 'admin' && (
+            <Link to="/admin" className="btn-primary py-2 text-sm">後台 <ChevronRight size={14} /></Link>
+          )}
         </div>
       </header>
 
@@ -71,7 +82,7 @@ export default function CustomerNav() {
         <div className="flex items-center gap-1">
           <button onClick={() => setNotifOpen(true)} className="p-2 rounded-xl text-paper-600 relative">
             <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
+            {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />}
           </button>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-xl text-paper-600 hover:bg-paper-100">
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
@@ -110,9 +121,11 @@ export default function CustomerNav() {
               : <Link to="/login" onClick={() => setMobileOpen(false)}
                   className="px-4 py-3 rounded-2xl text-sm font-medium text-paper-700 hover:bg-paper-100">登入</Link>
             }
-            <div className="mt-4 pt-4 border-t border-paper-200">
-              <Link to="/admin" onClick={() => setMobileOpen(false)} className="btn-primary w-full text-sm">後台管理 <ChevronRight size={14} /></Link>
-            </div>
+            {user?.role === 'admin' && (
+              <div className="mt-4 pt-4 border-t border-paper-200">
+                <Link to="/admin" onClick={() => setMobileOpen(false)} className="btn-primary w-full text-sm">後台管理 <ChevronRight size={14} /></Link>
+              </div>
+            )}
           </nav>
         </div>
       )}

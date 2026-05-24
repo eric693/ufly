@@ -39,7 +39,8 @@ export default function Profile() {
   const [referralInput, setReferralInput] = useState('')
   const [referralMsg, setReferralMsg]   = useState('')
 
-  const [enterprise, setEnterprise]     = useState<Enterprise | null | false>(null)
+  const [enterprise, setEnterprise]     = useState<Enterprise | null>(null)
+  const [loadingEnt, setLoadingEnt]     = useState(true)
   const [entForm, setEntForm]           = useState({ name: '', tax_id: '', contact_name: '', contact_phone: '', contact_email: '' })
   const [creatingEnt, setCreatingEnt]   = useState(false)
 
@@ -49,21 +50,25 @@ export default function Profile() {
 
   const [saving, setSaving]             = useState(false)
   const [editName, setEditName]         = useState(false)
+  const [editPhone, setEditPhone]       = useState(false)
   const [nameVal, setNameVal]           = useState(user?.name || '')
   const [phoneVal, setPhoneVal]         = useState('')
 
   useEffect(() => {
     api.get('/users/me/addresses').then(r => setAddresses(r.data)).catch(() => {})
     api.get('/users/me/referral/stats').then(r => setReferral(r.data)).catch(() => {})
-    api.get('/enterprises/mine').then(r => setEnterprise(r.data)).catch(() => setEnterprise(false))
+    api.get('/enterprises/mine').then(r => setEnterprise(r.data)).catch(() => setEnterprise(null)).finally(() => setLoadingEnt(false))
     api.get('/orders/recurring/list').then(r => setRecurring(r.data)).catch(() => {})
     api.get('/users/me').then(r => { setNameVal(r.data.name); setPhoneVal(r.data.phone || '') }).catch(() => {})
   }, [])
 
   const saveProfile = async () => {
     setSaving(true)
-    try { await api.put('/users/me', { name: nameVal, phone: phoneVal }); setEditName(false) }
-    catch { alert('儲存失敗') } finally { setSaving(false) }
+    try {
+      await api.put('/users/me', { name: nameVal, phone: phoneVal })
+      setEditName(false)
+      setEditPhone(false)
+    } catch { alert('儲存失敗') } finally { setSaving(false) }
   }
 
   const addAddress = async () => {
@@ -196,9 +201,24 @@ export default function Profile() {
             </div>
             <div className="flex items-center justify-between py-2.5 border-b border-paper-200">
               <div className="flex items-center gap-3 text-paper-500"><Phone size={16} /><span className="text-sm">電話</span></div>
-              <div className="flex items-center gap-2 text-sm font-medium text-paper-500">
-                {phoneVal || '未設定'} <ChevronRight size={14} className="text-paper-400" />
-              </div>
+              {editPhone ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="border border-paper-300 rounded-lg px-2 py-1 text-sm outline-none focus:border-paper-600 w-36"
+                    placeholder="0912-345-678"
+                    value={phoneVal}
+                    onChange={e => setPhoneVal(e.target.value)}
+                  />
+                  <button onClick={saveProfile} disabled={saving} className="text-xs font-medium text-paper-900 hover:text-paper-600">
+                    {saving ? <Loader2 size={13} className="animate-spin" /> : '儲存'}
+                  </button>
+                  <button onClick={() => setEditPhone(false)} className="text-xs text-paper-400">取消</button>
+                </div>
+              ) : (
+                <button onClick={() => setEditPhone(true)} className="flex items-center gap-2 text-sm font-medium text-paper-500 hover:text-paper-900 transition-colors">
+                  {phoneVal || '未設定'} <ChevronRight size={14} className="text-paper-400" />
+                </button>
+              )}
             </div>
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-3 text-paper-500"><Shield size={16} /><span className="text-sm">帳號類型</span></div>
@@ -328,7 +348,7 @@ export default function Profile() {
       {/* ── Enterprise Tab ── */}
       {activeTab === 'enterprise' && (
         <div className="space-y-3 animate-fade-in">
-          {enterprise === null ? (
+          {loadingEnt ? (
             <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-paper-400" /></div>
           ) : enterprise ? (
             <>

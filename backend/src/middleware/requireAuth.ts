@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import prisma from '../lib/prisma'
 
 export interface AuthRequest extends Request {
   user?: { id: string; role: string; name: string; email?: string; avatar?: string }
@@ -18,8 +19,12 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
   requireAuth(req, res, () => {
-    if (req.user?.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
-    next()
+    prisma.user.findUnique({ where: { id: req.user!.id }, select: { role: true } })
+      .then(dbUser => {
+        if (!dbUser || dbUser.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
+        next()
+      })
+      .catch(() => res.status(403).json({ error: 'Forbidden' }))
   })
 }
 

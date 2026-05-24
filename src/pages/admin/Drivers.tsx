@@ -66,7 +66,9 @@ export default function AdminDrivers() {
         setDrivers(prev => prev.map(d => d.id === editTarget.id ? data : d))
       }
       closeModal()
-    } catch { /* ignore */ } finally { setSaving(false) }
+    } catch (e: any) {
+      alert(e?.response?.data?.error || '儲存失敗，Email 或電話可能已重複')
+    } finally { setSaving(false) }
   }
 
   const deleteDriver = async (id: string) => {

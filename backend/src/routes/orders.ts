@@ -35,47 +35,6 @@ async function notify(userId: string, type: string, title: string, body: string)
 
 const flatOrder = serializeOrder
 
-const ORDER_STATUS_FLOW = ['pending', 'matching', 'accepted', 'pickup', 'delivering', 'completed']
-const STATUS_DELAYS_MS  = [3000, 6000, 10000, 18000, 35000]
-
-async function simulateOrderProgress(orderId: string, userId: string, io: Server | null) {
-  let step = 0
-  const advance = async () => {
-    step++
-    if (step >= ORDER_STATUS_FLOW.length) return
-    const status = ORDER_STATUS_FLOW[step]
-    const drivers = await prisma.driver.findMany({ where: { status: { not: 'offline' } } })
-    const driver = drivers[Math.floor(Math.random() * drivers.length)]
-
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status,
-        ...(step === 1 && driver ? { driverId: driver.id } : {}),
-      },
-      include: { driver: true },
-    })
-
-    const titles: Record<string, string> = { matching: '媒合中', accepted: '已接單', pickup: '取件中', delivering: '配送中', completed: '已送達' }
-    if (titles[status]) {
-      await notify(userId, status === 'completed' ? 'success' : 'info', titles[status], `訂單 ${orderId} — ${titles[status]}`)
-    }
-    if (status === 'completed') {
-      await prisma.user.update({ where: { id: userId }, data: { totalOrders: { increment: 1 } } })
-    }
-
-    if (io) {
-      io.to(`user:${userId}`).emit('order:update', flatOrder(updated))
-      if (status === 'matching') io.to('drivers').emit('order:new', flatOrder(updated))
-    }
-
-    if (step < ORDER_STATUS_FLOW.length - 1) {
-      setTimeout(advance, STATUS_DELAYS_MS[step])
-    }
-  }
-  setTimeout(advance, STATUS_DELAYS_MS[0])
-}
-
 // IMPORTANT: /recurring/* routes must come before /:id
 router.get('/recurring/list', requireAuth, async (req: AuthRequest, res) => {
   const rows = await prisma.recurringOrder.findMany({ where: { userId: req.user!.id }, orderBy: { createdAt: 'desc' } })
@@ -124,11 +83,13 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   const fare = calcFare(distance, speed_tier, discount)
   const id = await nextOrderId()
 
+  const initialStatus = scheduled_at ? 'pending' : 'matching'
+
   const order = await prisma.order.create({
     data: {
       id, userId: req.user!.id,
       serviceType: service_type || 'delivery',
-      status: 'pending',
+      status: initialStatus,
       pickupAddress: pickup_address, pickupPhone: pickup_phone || null,
       deliveryAddress: delivery_address, deliveryPhone: delivery_phone || null,
       itemContent: item_content || null, itemNote: item_note || null,
@@ -143,9 +104,10 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   await notify(req.user!.id, 'info', '訂單已建立', `${id} — 正在媒合任務夥伴`)
 
   const io: Server | null = req.app.get('io')
-  if (io) io.to(`user:${req.user!.id}`).emit('order:update', flatOrder(order))
-
-  if (!scheduled_at) simulateOrderProgress(id, req.user!.id, io)
+  if (io) {
+    io.to(`user:${req.user!.id}`).emit('order:update', flatOrder(order))
+    if (initialStatus === 'matching') io.to('drivers').emit('order:new', flatOrder(order))
+  }
 
   res.json(flatOrder(order))
 })

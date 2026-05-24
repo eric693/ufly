@@ -79,9 +79,7 @@ export default function AdminCustomers() {
                     <td className="px-5 py-4 text-sm text-gray-300">
                       {new Date(c.created_at).toLocaleDateString('zh-TW')}
                     </td>
-                    <td className="px-5 py-4 font-semibold text-white text-sm">
-                      {c.total_orders ? `NT$${(c.total_orders * 200).toLocaleString()}` : '—'}
-                    </td>
+                    <td className="px-5 py-4 font-semibold text-white text-sm">—</td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
