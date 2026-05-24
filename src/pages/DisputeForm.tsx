@@ -11,6 +11,8 @@ export default function DisputeForm() {
   const [params]       = useSearchParams()
   const orderId        = params.get('order') || ''
   const { t }          = useI18n()
+  const [manualOrderId, setManualOrderId] = useState('')
+  const effectiveOrderId = orderId || manualOrderId
   const [reason, setReason]       = useState('')
   const [description, setDesc]    = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -24,7 +26,7 @@ export default function DisputeForm() {
     setSubmitting(true)
     setError('')
     try {
-      await api.post('/disputes', { order_id: orderId, reason, description: description.trim() })
+      await api.post('/disputes', { order_id: effectiveOrderId, reason, description: description.trim() })
       setSubmitted(true)
     } catch (e: any) {
       setError(e?.response?.data?.error || '提交失敗，請稍後再試')
@@ -62,8 +64,8 @@ export default function DisputeForm() {
           <div className="card">
             <label className="block text-sm font-semibold mb-2">訂單編號</label>
             <input
-              value={orderId}
-              readOnly
+              value={manualOrderId}
+              onChange={e => setManualOrderId(e.target.value)}
               placeholder="輸入訂單編號"
               className="input w-full"
             />

@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import qs from 'querystring'
 import axios from 'axios'
 import prisma from '../lib/prisma'
 import { requireAuth, AuthRequest } from '../middleware/requireAuth'
@@ -36,10 +35,10 @@ router.post('/create', requireAuth, async (req: AuthRequest, res) => {
   if (existing?.status === 'paid') { res.status(400).json({ error: '訂單已付款' }); return }
 
   const merchantTradeNo = `UF${Date.now()}`.slice(0, 20)
-  const merchantTradeDate = new Date().toLocaleString('zh-TW', {
-    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).replace(/\//g, '/').replace(',', '')
+  // ECPay requires exactly: yyyy/MM/dd HH:mm:ss (Taipei time)
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const merchantTradeDate = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
 
   const backendUrl = process.env.BACKEND_URL || 'https://ufly.crownai.ink'
   const frontendUrl = process.env.FRONTEND_URL || 'https://ufly.crownai.ink'

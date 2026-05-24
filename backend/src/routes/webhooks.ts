@@ -58,11 +58,15 @@ router.patch('/mine/:id', requireAuth, async (req: AuthRequest, res) => {
   res.json({ ok: true })
 })
 
-// Delete endpoint
+// Delete endpoint (also cascades deliveries via Prisma transaction)
 router.delete('/mine/:id', requireAuth, async (req: AuthRequest, res) => {
   const eid = await getEnterpriseId(req.user!.id)
   if (!eid) { res.status(403).json({ error: '需要企業帳號' }); return }
-  await prisma.webhookEndpoint.deleteMany({ where: { id: req.params.id, enterpriseId: eid } })
+  // Delete deliveries first (no DB-level cascade), then the endpoint
+  const ep = await prisma.webhookEndpoint.findFirst({ where: { id: req.params.id, enterpriseId: eid }, select: { id: true } })
+  if (!ep) { res.status(404).json({ error: '不存在' }); return }
+  await prisma.webhookDelivery.deleteMany({ where: { endpointId: ep.id } })
+  await prisma.webhookEndpoint.delete({ where: { id: ep.id } })
   res.json({ ok: true })
 })
 

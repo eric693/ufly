@@ -26,6 +26,7 @@ export function serializeOrder(order: any) {
     recurring_id:     o.recurringId,
     created_at:       o.createdAt,
     updated_at:       o.updatedAt,
+    photo_url:        o.photoUrl     ?? null,
     driver_name:      driver?.name   ?? null,
     driver_phone:     driver?.phone  ?? null,
     driver_rating:    driver?.rating ?? null,

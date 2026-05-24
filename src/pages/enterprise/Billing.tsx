@@ -35,8 +35,11 @@ export default function EnterpriseBilling() {
   // Fetch enterprise info first
   useEffect(() => {
     api.get('/enterprises/mine')
-      .then(r => { if (r.data?.id) setEntId(r.data.id) })
-      .catch(() => setError('無法取得企業資訊'))
+      .then(r => {
+        if (r.data?.id) setEntId(r.data.id)
+        else setLoading(false)
+      })
+      .catch(() => { setError('無法取得企業資訊'); setLoading(false) })
   }, [])
 
   useEffect(() => {

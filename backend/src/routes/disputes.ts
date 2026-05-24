@@ -70,6 +70,8 @@ router.patch('/admin/:id', requireAdmin, async (req: AuthRequest, res) => {
   if (!['investigating', 'resolved', 'rejected'].includes(status)) {
     res.status(400).json({ error: '無效的狀態' }); return
   }
+  const exists = await prisma.dispute.findUnique({ where: { id: req.params.id }, select: { id: true } })
+  if (!exists) { res.status(404).json({ error: '申訴不存在' }); return }
   const dispute = await prisma.dispute.update({
     where: { id: req.params.id },
     data: { status, resolution: resolution || null, resolvedBy: req.user!.id },

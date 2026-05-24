@@ -3,6 +3,11 @@ import { v4 as uuidv4 } from 'uuid'
 import prisma from '../lib/prisma'
 import { requireAuth, requireAdmin, AuthRequest } from '../middleware/requireAuth'
 
+async function getEnterpriseIdForUser(userId: string) {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { enterpriseId: true, role: true } })
+  return u
+}
+
 const router = Router()
 
 router.get('/mine', requireAuth, async (req: AuthRequest, res) => {
@@ -56,8 +61,13 @@ router.get('/', requireAdmin, async (_req, res) => {
   res.json(rows.map(({ _count, ...e }) => ({ ...e, member_count: _count.members })))
 })
 
-// Monthly billing report for an enterprise
-router.get('/:id/billing', requireAdmin, async (req, res) => {
+// Monthly billing report — accessible by admin OR enterprise member viewing their own enterprise
+router.get('/:id/billing', requireAuth, async (req: AuthRequest, res) => {
+  const caller = await getEnterpriseIdForUser(req.user!.id)
+  const isAdmin = caller?.role === 'admin'
+  const isMember = caller?.enterpriseId === req.params.id
+  if (!isAdmin && !isMember) { res.status(403).json({ error: '無存取權限' }); return }
+
   const ent = await prisma.enterprise.findUnique({ where: { id: req.params.id } })
   if (!ent) { res.status(404).json({ error: '企業不存在' }); return }
 

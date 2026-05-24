@@ -36,16 +36,17 @@ export function setupSocketIO(io: Server) {
       const lat = Number(payload?.lat)
       const lng = Number(payload?.lng)
       if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return
-      await prisma.driver.update({ where: { id: user.id }, data: { lat, lng } })
-      io.to('admin').emit('driver:locationUpdate', { driverId: user.id, lat, lng })
-      // Forward to the customer tracking this driver's active order
-      const activeOrder = await prisma.order.findFirst({
-        where: { driverId: user.id, status: { in: ['accepted', 'pickup', 'delivering'] } },
-        select: { userId: true },
-      })
-      if (activeOrder) {
-        io.to(`user:${activeOrder.userId}`).emit('driver:locationUpdate', { driverId: user.id, lat, lng })
-      }
+      try {
+        await prisma.driver.update({ where: { id: user.id }, data: { lat, lng } })
+        io.to('admin').emit('driver:locationUpdate', { driverId: user.id, lat, lng })
+        const activeOrder = await prisma.order.findFirst({
+          where: { driverId: user.id, status: { in: ['accepted', 'pickup', 'delivering'] } },
+          select: { userId: true },
+        })
+        if (activeOrder) {
+          io.to(`user:${activeOrder.userId}`).emit('driver:locationUpdate', { driverId: user.id, lat, lng })
+        }
+      } catch { /* DB transient error — skip this position update */ }
     })
   })
 

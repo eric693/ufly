@@ -11,6 +11,11 @@ const API_URL  = process.env.API_URL      || 'http://localhost:3001'
 
 // CSRF state store: state → expiresAt (10 min TTL)
 const oauthStates = new Map<string, number>()
+// Purge expired states every 15 min to prevent unbounded growth
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, exp] of oauthStates) { if (exp < now) oauthStates.delete(k) }
+}, 15 * 60 * 1000).unref()
 
 function makeToken(payload: { id: string; name: string; role: string; email?: string | null; avatar?: string | null }) {
   return jwt.sign(
