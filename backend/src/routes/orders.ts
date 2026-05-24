@@ -94,7 +94,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
   const offset = Math.max(0, parseInt(req.query.offset as string) || 0)
   const orders = await prisma.order.findMany({
     where: { userId: req.user!.id, ...(status ? { status } : {}) },
-    include: { driver: { select: { name: true, phone: true, rating: true } } },
+    include: { driver: { select: { name: true, phone: true, rating: true, lat: true, lng: true } } },
     orderBy: { createdAt: 'desc' },
     take: limit,
     skip: offset,

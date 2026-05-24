@@ -30,7 +30,13 @@ router.post('/mine', requireAuth, async (req: AuthRequest, res) => {
 
   const { url, events } = req.body
   if (!url) { res.status(400).json({ error: '請填寫 Webhook URL' }); return }
-  try { new URL(url) } catch { res.status(400).json({ error: '無效的 URL 格式' }); return }
+  let parsed: URL
+  try { parsed = new URL(url) } catch { res.status(400).json({ error: '無效的 URL 格式' }); return }
+  if (!['http:', 'https:'].includes(parsed.protocol)) { res.status(400).json({ error: '只接受 HTTP/HTTPS URL' }); return }
+  const host = parsed.hostname
+  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) {
+    res.status(400).json({ error: '不允許使用內部 IP 位址' }); return
+  }
 
   const secret   = crypto.randomBytes(32).toString('hex')
   const endpoint = await prisma.webhookEndpoint.create({

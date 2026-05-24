@@ -82,16 +82,20 @@ router.post('/callback', async (req, res) => {
   const computed = ecpayCheckMac(rest)
   if (computed !== CheckMacValue) { res.send('0|Error'); return }
 
-  if (body.RtnCode === '1') {
-    const payment = await prisma.payment.findFirst({ where: { merchantTradeNo: body.MerchantTradeNo } })
-    if (payment) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'paid', tradeNo: body.TradeNo, paidAt: new Date() },
-      })
+  try {
+    if (body.RtnCode === '1') {
+      const payment = await prisma.payment.findFirst({ where: { merchantTradeNo: body.MerchantTradeNo } })
+      if (payment) {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'paid', tradeNo: body.TradeNo, paidAt: new Date() },
+        })
+      }
     }
+    res.send('1|OK')
+  } catch {
+    res.send('0|Error')
   }
-  res.send('1|OK')
 })
 
 // GET /api/payments/:orderId — get payment status

@@ -71,8 +71,9 @@ router.get('/:id/billing', requireAuth, async (req: AuthRequest, res) => {
   const ent = await prisma.enterprise.findUnique({ where: { id: req.params.id } })
   if (!ent) { res.status(404).json({ error: '企業不存在' }); return }
 
-  const year  = parseInt(req.query.year  as string) || new Date().getFullYear()
-  const month = parseInt(req.query.month as string) || new Date().getMonth() + 1
+  const year     = parseInt(req.query.year  as string) || new Date().getFullYear()
+  const rawMonth = parseInt(req.query.month as string)
+  const month    = (rawMonth >= 1 && rawMonth <= 12) ? rawMonth : new Date().getMonth() + 1
 
   const from = new Date(year, month - 1, 1)
   const to   = new Date(year, month, 1)

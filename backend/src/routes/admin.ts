@@ -36,7 +36,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: { user: { select: { name: true } }, driver: { select: { name: true } } },
+      include: { user: { select: { name: true } }, driver: { select: { name: true, phone: true, rating: true, lat: true, lng: true } } },
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: (page - 1) * limit,
@@ -105,7 +105,10 @@ router.put('/drivers/:id', requireAdmin, async (req, res) => {
 })
 
 router.put('/drivers/:id/status', requireAdmin, async (req, res) => {
-  await prisma.driver.update({ where: { id: req.params.id }, data: { status: req.body.status } })
+  const { status } = req.body
+  if (!['online', 'offline', 'busy'].includes(status)) { res.status(400).json({ error: 'Invalid status' }); return }
+  const r = await prisma.driver.updateMany({ where: { id: req.params.id }, data: { status } })
+  if (r.count === 0) { res.status(404).json({ error: '司機不存在' }); return }
   res.json({ ok: true })
 })
 
