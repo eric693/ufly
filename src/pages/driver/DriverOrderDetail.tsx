@@ -25,8 +25,16 @@ export default function DriverOrderDetail() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get(`/drivers/me/current`)
-      .then(r => { setOrder(r.data); setLoading(false) })
+    api.get('/drivers/me/current')
+      .then(r => {
+        const current = r.data
+        if (current && current.id !== id) {
+          navigate(`/driver/order/${current.id}`, { replace: true })
+          return
+        }
+        setOrder(current)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
 
     const socket = getSocket()

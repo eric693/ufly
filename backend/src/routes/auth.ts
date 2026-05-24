@@ -3,6 +3,7 @@ import axios from 'axios'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import prisma from '../lib/prisma'
+import { serializeUser } from '../lib/serializer'
 
 const router = Router()
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -128,9 +129,9 @@ router.get('/me', async (req, res) => {
     const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as { id: string }
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, name: true, email: true, phone: true, avatar: true, role: true, rating: true, totalOrders: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, avatar: true, role: true, rating: true, totalOrders: true, referralCode: true, createdAt: true },
     })
-    res.json(user ?? null)
+    res.json(user ? serializeUser(user) : null)
   } catch {
     res.json(null)
   }
