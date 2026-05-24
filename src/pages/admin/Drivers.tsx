@@ -1,41 +1,50 @@
-import { useState } from 'react'
-import { Search, Plus, Phone, Star, MapPin, TrendingUp } from 'lucide-react'
-import { MOCK_DRIVERS } from '../../data/mockData'
-import type { Driver } from '../../types'
+import { useState, useEffect } from 'react'
+import { Search, Plus, Phone, Star, MapPin, TrendingUp, Loader2 } from 'lucide-react'
+import api from '../../lib/api'
 
-const STATUS_LABEL = { online: '在線', busy: '任務中', offline: '離線' }
-const STATUS_CLASS = {
-  online:  'admin-badge-green',
-  busy:    'admin-badge-yellow',
-  offline: 'admin-badge-gray',
+const STATUS_LABEL: Record<string, string> = { online: '在線', busy: '任務中', offline: '離線' }
+const STATUS_CLASS: Record<string, string> = {
+  online: 'admin-badge-green', busy: 'admin-badge-yellow', offline: 'admin-badge-gray',
 }
 
 export default function AdminDrivers() {
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | Driver['status']>('all')
+  const [drivers, setDrivers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch]   = useState('')
+  const [filter, setFilter]   = useState<'all' | 'online' | 'busy' | 'offline'>('all')
+  const [updating, setUpdating] = useState<string | null>(null)
 
-  const filtered = MOCK_DRIVERS.filter(d => {
+  useEffect(() => {
+    api.get('/admin/drivers').then(r => setDrivers(r.data || [])).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const filtered = drivers.filter(d => {
     if (filter !== 'all' && d.status !== filter) return false
-    if (search && !d.name.includes(search) && !d.phone.includes(search) && !d.area.includes(search)) return false
+    if (search && !d.name.includes(search) && !(d.phone || '').includes(search) && !(d.area || '').includes(search)) return false
     return true
   })
 
   const counts = {
-    online:  MOCK_DRIVERS.filter(d => d.status === 'online').length,
-    busy:    MOCK_DRIVERS.filter(d => d.status === 'busy').length,
-    offline: MOCK_DRIVERS.filter(d => d.status === 'offline').length,
+    online:  drivers.filter(d => d.status === 'online').length,
+    busy:    drivers.filter(d => d.status === 'busy').length,
+    offline: drivers.filter(d => d.status === 'offline').length,
+  }
+
+  const updateStatus = async (id: string, status: string) => {
+    setUpdating(id)
+    try {
+      await api.put(`/admin/drivers/${id}/status`, { status })
+      setDrivers(prev => prev.map(d => d.id === id ? { ...d, status } : d))
+    } catch { /* ignore */ } finally { setUpdating(null) }
   }
 
   return (
     <div className="animate-fade-in space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">夥伴管理</h1>
-        <button className="btn-primary py-2 text-sm">
-          <Plus size={16} /> 新增夥伴
-        </button>
+        <button className="btn-primary py-2 text-sm"><Plus size={16} /> 新增夥伴</button>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
         {(['online', 'busy', 'offline'] as const).map(s => (
           <div key={s} className="bg-surface-800 border border-surface-700 rounded-2xl p-4">
@@ -48,88 +57,71 @@ export default function AdminDrivers() {
         ))}
       </div>
 
-      {/* Search & filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 bg-surface-800 border border-surface-700 rounded-xl px-3 py-2 flex-1">
           <Search size={16} className="text-gray-400" />
-          <input
-            className="bg-transparent text-sm placeholder-surface-400 text-white outline-none flex-1"
-            placeholder="搜尋姓名、電話、區域..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <input className="bg-transparent text-sm placeholder-gray-500 text-white outline-none flex-1"
+            placeholder="搜尋姓名、電話、區域..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-1.5">
           {(['all', 'online', 'busy', 'offline'] as const).map(s => (
-            <button key={s}
-              onClick={() => setFilter(s)}
+            <button key={s} onClick={() => setFilter(s)}
               className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors
-                ${filter === s
-                  ? 'bg-white text-black'
-                  : 'bg-surface-800 border border-surface-700 text-gray-300 hover:text-white'}`}>
+                ${filter === s ? 'bg-white text-black' : 'bg-surface-800 border border-surface-700 text-gray-300 hover:text-white'}`}>
               {s === 'all' ? '全部' : STATUS_LABEL[s]}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {filtered.map(d => (
-          <div key={d.id} className="bg-surface-800 border border-surface-700 rounded-2xl p-4 space-y-3
-                                     hover:border-surface-500 transition-colors cursor-pointer">
-            {/* Avatar + status */}
-            <div className="flex items-start justify-between">
-              <div className="relative">
-                <div className="w-12 h-12 bg-surface-700 rounded-2xl flex items-center justify-center
-                                text-lg font-bold border border-surface-600">
-                  {d.name[0]}
+      {loading ? (
+        <div className="py-12 text-center"><Loader2 size={24} className="animate-spin text-gray-400 mx-auto" /></div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filtered.map(d => (
+            <div key={d.id} className="bg-surface-800 border border-surface-700 rounded-2xl p-4 space-y-3 hover:border-surface-500 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-surface-700 rounded-2xl flex items-center justify-center text-lg font-bold border border-surface-600">{d.name[0]}</div>
+                  <div className={`absolute -bottom-0.5 -right-0.5 ${d.status === 'online' ? 'status-online' : d.status === 'busy' ? 'status-busy' : 'status-offline'}`} />
                 </div>
-                <div className={`absolute -bottom-0.5 -right-0.5
-                  ${d.status === 'online' ? 'status-online' : d.status === 'busy' ? 'status-busy' : 'status-offline'}`} />
+                <span className={STATUS_CLASS[d.status] || 'admin-badge-gray'}>{STATUS_LABEL[d.status]}</span>
               </div>
-              <span className={STATUS_CLASS[d.status]}>{STATUS_LABEL[d.status]}</span>
-            </div>
-
-            {/* Info */}
-            <div>
-              <div className="font-bold">{d.name}</div>
-              <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5">
-                <MapPin size={11} /> {d.area}
+              <div>
+                <div className="font-bold">{d.name}</div>
+                <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5"><MapPin size={11} /> {d.area}</div>
               </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-surface-700 rounded-xl p-2.5">
-                <div className="flex items-center gap-1 text-yellow-400 text-xs mb-0.5">
-                  <Star size={10} className="fill-yellow-400" /> 評分
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-surface-700 rounded-xl p-2.5">
+                  <div className="flex items-center gap-1 text-yellow-400 text-xs mb-0.5"><Star size={10} className="fill-yellow-400" /> 評分</div>
+                  <div className="font-bold text-sm">{d.rating?.toFixed(1)}</div>
                 </div>
-                <div className="font-bold text-sm">{d.rating}</div>
-              </div>
-              <div className="bg-surface-700 rounded-xl p-2.5">
-                <div className="flex items-center gap-1 text-white text-xs mb-0.5">
-                  <TrendingUp size={10} /> 完成
+                <div className="bg-surface-700 rounded-xl p-2.5">
+                  <div className="flex items-center gap-1 text-white text-xs mb-0.5"><TrendingUp size={10} /> 完成</div>
+                  <div className="font-bold text-sm">{d.total_trips}</div>
                 </div>
-                <div className="font-bold text-sm">{d.completedOrders}</div>
+              </div>
+              <div className="flex gap-2">
+                {d.phone && (
+                  <a href={`tel:${d.phone}`} className="flex-1 flex items-center justify-center gap-1.5 bg-surface-700 hover:bg-surface-600 rounded-xl py-2 text-xs text-gray-300 hover:text-white transition-colors">
+                    <Phone size={13} /> 聯絡
+                  </a>
+                )}
+                <select value={d.status} disabled={updating === d.id}
+                  onChange={e => updateStatus(d.id, e.target.value)}
+                  className="flex-1 bg-surface-700 hover:bg-surface-600 border-0 rounded-xl py-2 text-xs text-gray-300 outline-none cursor-pointer">
+                  <option value="online">在線</option>
+                  <option value="busy">任務中</option>
+                  <option value="offline">離線</option>
+                </select>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <a href={`tel:${d.phone}`}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-surface-700
-                           hover:bg-surface-600 rounded-xl py-2 text-xs text-gray-300 hover:text-white transition-colors">
-                <Phone size={13} /> 聯絡
-              </a>
-              <button className="flex-1 bg-surface-700 hover:bg-surface-600 rounded-xl py-2 text-xs
-                                 text-gray-300 hover:text-white transition-colors">
-                詳情
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="col-span-full py-12 text-center text-gray-500 text-sm">無符合夥伴</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

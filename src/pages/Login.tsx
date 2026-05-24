@@ -18,7 +18,7 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <Logo size="lg" dark />
           </div>
-          <p className="text-white/50 text-sm">台中城市任務平台</p>
+          <p className="text-white/50 text-sm">台北城市任務平台</p>
         </div>
 
         {error && (

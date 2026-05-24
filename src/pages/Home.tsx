@@ -159,7 +159,7 @@ export default function Home() {
               { icon: Users,  label: '專人服務', desc: '真人接單，全程追蹤', bg: '#EEF2FF', color: '#4F46E5' },
               { icon: Clock,  label: '快速媒合', desc: '最快 20 分鐘完成',   bg: '#FFF7ED', color: '#EA580C' },
               { icon: Shield, label: '安全可靠', desc: '實名驗證，保障安心', bg: '#F0FDF4', color: '#16A34A' },
-              { icon: Truck,  label: '彈性配送', desc: '台中全區服務',       bg: '#EFF6FF', color: '#2563EB' },
+              { icon: Truck,  label: '彈性配送', desc: '台北全區服務',       bg: '#EFF6FF', color: '#2563EB' },
             ].map(f => (
               <div key={f.label} className="bg-white rounded-2xl p-4 border border-paper-200 shadow-card flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"

@@ -1,30 +1,42 @@
 import { useState } from 'react'
-import { Star, X, ThumbsUp, Navigation } from 'lucide-react'
+import { Star, X, ThumbsUp, Navigation, Loader2 } from 'lucide-react'
+import api from '../lib/api'
 
 interface Props {
   open: boolean
   onClose: () => void
   driverName?: string
   orderId?: string
+  onSubmitted?: (orderId: string) => void
 }
 
 const QUICK_TAGS = ['準時到達', '態度親切', '小心輕放', '主動聯繫', '迅速完成']
 
-export default function RatingModal({ open, onClose, driverName = '王小明', orderId = 'UF240001' }: Props) {
-  const [rating, setRating]   = useState(0)
-  const [hover, setHover]     = useState(0)
-  const [tags, setTags]       = useState<string[]>([])
-  const [comment, setComment] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+export default function RatingModal({ open, onClose, driverName = '任務夥伴', orderId, onSubmitted }: Props) {
+  const [rating, setRating]         = useState(0)
+  const [hover, setHover]           = useState(0)
+  const [tags, setTags]             = useState<string[]>([])
+  const [comment, setComment]       = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted]   = useState(false)
 
   if (!open) return null
 
-  const toggleTag = (t: string) =>
-    setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  const toggleTag = (t: string) => setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
 
-  const handleSubmit = () => {
-    setSubmitted(true)
-    setTimeout(() => { setSubmitted(false); onClose() }, 1800)
+  const handleSubmit = async () => {
+    if (!orderId || rating === 0 || submitting) return
+    setSubmitting(true)
+    try {
+      await api.post(`/orders/${orderId}/rate`, { score: rating, tags, comment })
+      setSubmitted(true)
+      setTimeout(() => {
+        setSubmitted(false); setRating(0); setTags([]); setComment('')
+        onSubmitted?.(orderId)
+      }, 1800)
+    } catch (e: any) {
+      alert(e?.response?.data?.error || '評分失敗，請再試一次')
+    } finally { setSubmitting(false) }
   }
 
   return (
@@ -52,7 +64,7 @@ export default function RatingModal({ open, onClose, driverName = '王小明', o
                 <Navigation size={26} className="text-indigo-600" />
               </div>
               <div className="font-bold text-lg">{driverName}</div>
-              <div className="text-paper-500 text-sm mt-0.5">訂單 {orderId} · 已完成</div>
+              {orderId && <div className="text-paper-500 text-sm mt-0.5">訂單 {orderId} · 已完成</div>}
             </div>
 
             {/* Stars */}
@@ -102,11 +114,9 @@ export default function RatingModal({ open, onClose, driverName = '王小明', o
                          focus:border-paper-600 outline-none transition-colors mb-4"
             />
 
-            <button
-              disabled={rating === 0}
-              onClick={handleSubmit}
+            <button disabled={rating === 0 || submitting} onClick={handleSubmit}
               className="btn-primary w-full disabled:opacity-40">
-              送出評價
+              {submitting ? <><Loader2 size={16} className="animate-spin" /> 送出中…</> : '送出評價'}
             </button>
           </>
         )}

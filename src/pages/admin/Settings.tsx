@@ -5,7 +5,7 @@ export default function AdminSettings() {
   const [saved, setSaved] = useState(false)
   const [settings, setSettings] = useState({
     platformName: 'Ufly 城市任務平台',
-    serviceArea: '台中市（以豐原區為主）',
+    serviceArea: '台北市（以中正區為主）',
     baseFee: '120',
     expressSurcharge: '30',
     prioritySurcharge: '80',
