@@ -59,7 +59,7 @@ router.post('/create', requireAuth, async (req: AuthRequest, res) => {
     TradeDesc: `Ufly訂單${order_id}`,
     ItemName: `配送服務 ${order.serviceType}`,
     ReturnURL: `${backendUrl}/api/payments/callback`,
-    OrderResultURL: `${frontendUrl}/orders/${order_id}`,
+    OrderResultURL: `${frontendUrl}/tracking?id=${order_id}`,
     ChoosePayment: 'ALL',
     EncryptType: '1',
   }
