@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, Bell, User, ChevronRight, LogOut } from 'lucide-react'
 import Logo from './Logo'
 import NotificationPanel from './NotificationPanel'
+import LanguageSwitcher from './LanguageSwitcher'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import api from '../lib/api'
 
 export default function CustomerNav() {
@@ -12,6 +14,7 @@ export default function CustomerNav() {
   const [unreadCount, setUnreadCount] = useState(0)
   const { pathname } = useLocation()
   const { user, logout } = useAuth()
+  const { t } = useI18n()
 
   useEffect(() => {
     if (!user) { setUnreadCount(0); return }
@@ -21,10 +24,10 @@ export default function CustomerNav() {
   }, [user, notifOpen])
 
   const links = [
-    { to: '/',         label: '首頁' },
-    { to: '/order',    label: '立即下單' },
-    { to: '/tracking', label: '追蹤訂單' },
-    { to: '/history',  label: '活動' },
+    { to: '/',         label: t.nav.home },
+    { to: '/order',    label: t.nav.order },
+    { to: '/tracking', label: t.nav.tracking },
+    { to: '/history',  label: t.nav.history },
   ]
 
   return (
@@ -45,6 +48,7 @@ export default function CustomerNav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <button onClick={() => setNotifOpen(true)}
             className="p-2 rounded-xl text-paper-600 hover:bg-paper-100 transition-colors relative">
             <Bell size={20} />

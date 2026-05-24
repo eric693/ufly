@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   User, MapPin, ChevronRight, Edit2, Plus,
-  Home, Briefcase, Star, Package, TrendingUp, Check, Phone,
+  Home, Briefcase, Star, Package, Check, Phone,
   LogOut, Trash2, Shield, Bell, Copy, Users, RefreshCw, Loader2,
-  Building2, CalendarClock,
+  Building2, CalendarClock, FileText, Webhook, AlertTriangle,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 
@@ -269,6 +270,14 @@ export default function Profile() {
             </div>
           </div>
 
+          <div className="card space-y-1">
+            <Link to="/dispute"
+              className="flex items-center justify-between py-2.5 hover:bg-paper-50 rounded-xl px-1 transition-colors">
+              <div className="flex items-center gap-3 text-paper-500"><AlertTriangle size={16} /><span className="text-sm">申訴爭議</span></div>
+              <ChevronRight size={14} className="text-paper-400" />
+            </Link>
+          </div>
+
           <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-3 text-red-400 hover:text-red-300 text-sm font-medium transition-colors">
             <LogOut size={16} /> 登出帳號
           </button>
@@ -376,6 +385,18 @@ export default function Profile() {
               <div className="card space-y-2 text-sm">
                 {enterprise.contact_name && <Row label="聯絡人" value={enterprise.contact_name} />}
                 {enterprise.contact_phone && <Row label="電話" value={enterprise.contact_phone} />}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/enterprise/billing"
+                  className="card flex flex-col items-center gap-2 py-4 hover:border-paper-400 transition-colors cursor-pointer">
+                  <FileText size={20} className="text-indigo-500" />
+                  <span className="text-sm font-medium">月結帳單</span>
+                </Link>
+                <Link to="/enterprise/webhooks"
+                  className="card flex flex-col items-center gap-2 py-4 hover:border-paper-400 transition-colors cursor-pointer">
+                  <Webhook size={20} className="text-paper-500" />
+                  <span className="text-sm font-medium">Webhook</span>
+                </Link>
               </div>
             </>
           ) : (

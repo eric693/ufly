@@ -1,16 +1,19 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Home, PlusCircle, MapPin, Clock, User } from 'lucide-react'
-
-const tabs = [
-  { to: '/',         icon: Home,       label: '首頁' },
-  { to: '/order',    icon: PlusCircle, label: '下單' },
-  { to: '/tracking', icon: MapPin,     label: '追蹤' },
-  { to: '/history',  icon: Clock,      label: '活動' },
-  { to: '/profile',  icon: User,       label: '帳戶' },
-]
+import { useI18n } from '../contexts/I18nContext'
 
 export default function MobileBottomNav() {
   const { pathname } = useLocation()
+  const { t } = useI18n()
+
+  const tabs = [
+    { to: '/',         icon: Home,       label: t.nav.home },
+    { to: '/order',    icon: PlusCircle, label: t.nav.order },
+    { to: '/tracking', icon: MapPin,     label: t.nav.tracking },
+    { to: '/history',  icon: Clock,      label: t.nav.history },
+    { to: '/profile',  icon: User,       label: t.nav.profile },
+  ]
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50
                     bg-white border-t border-paper-200 shadow-card-xl

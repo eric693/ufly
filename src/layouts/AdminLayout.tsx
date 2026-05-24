@@ -4,19 +4,21 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, ClipboardList, Users, Navigation,
   Settings, ChevronLeft, ChevronRight, Menu, X,
-  Bell, Search, LogOut, BarChart2, Map,
+  Bell, Search, LogOut, BarChart2, Map, AlertTriangle,
 } from 'lucide-react'
 import Logo from '../components/Logo'
 import NotificationPanel from '../components/NotificationPanel'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const NAV_ITEMS = [
-  { to: '/admin',           icon: LayoutDashboard, label: '儀表板' },
-  { to: '/admin/orders',    icon: ClipboardList,   label: '訂單管理' },
-  { to: '/admin/drivers',   icon: Navigation,      label: '夥伴管理' },
-  { to: '/admin/map',       icon: Map,             label: '即時地圖' },
-  { to: '/admin/analytics', icon: BarChart2,       label: '數據分析' },
-  { to: '/admin/customers', icon: Users,           label: '客戶管理' },
-  { to: '/admin/settings',  icon: Settings,        label: '系統設定' },
+  { to: '/admin',            icon: LayoutDashboard, label: '儀表板' },
+  { to: '/admin/orders',     icon: ClipboardList,   label: '訂單管理' },
+  { to: '/admin/drivers',    icon: Navigation,      label: '夥伴管理' },
+  { to: '/admin/map',        icon: Map,             label: '即時地圖' },
+  { to: '/admin/analytics',  icon: BarChart2,       label: '數據分析' },
+  { to: '/admin/customers',  icon: Users,           label: '客戶管理' },
+  { to: '/admin/disputes',   icon: AlertTriangle,   label: '爭議管理' },
+  { to: '/admin/settings',   icon: Settings,        label: '系統設定' },
 ]
 
 export default function AdminLayout() {
@@ -115,6 +117,7 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher dark />
             <button onClick={() => setNotifOpen(true)}
               className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-surface-700 relative">
               <Bell size={20} />

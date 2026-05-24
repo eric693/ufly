@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, RotateCcw, Star, SlidersHorizontal, MapPin, Package, Loader2, X } from 'lucide-react'
+import { Search, RotateCcw, Star, SlidersHorizontal, MapPin, Package, Loader2, X, AlertTriangle } from 'lucide-react'
 import RatingModal from '../components/RatingModal'
 import api from '../lib/api'
 import type { OrderStatus } from '../types'
@@ -186,6 +186,12 @@ export default function OrderHistory() {
                       className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 rounded-xl px-2.5 py-1.5 text-xs font-medium text-yellow-700 transition-colors">
                       <Star size={11} /> 評分
                     </button>
+                  )}
+                  {o.status === 'completed' && (
+                    <Link to={`/dispute?order=${o.id}`}
+                      className="flex items-center gap-1 bg-paper-50 border border-paper-200 hover:bg-paper-100 rounded-xl px-2.5 py-1.5 text-xs font-medium text-paper-600 transition-colors">
+                      <AlertTriangle size={11} /> 申訴
+                    </Link>
                   )}
                   {['pending', 'matching'].includes(o.status) && (
                     <button onClick={() => cancelOrder(o.id)}

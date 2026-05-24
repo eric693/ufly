@@ -11,6 +11,9 @@ import OrderHistory from './pages/OrderHistory'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import DisputeForm from './pages/DisputeForm'
+import EnterpriseBilling from './pages/enterprise/Billing'
+import EnterpriseWebhooks from './pages/enterprise/Webhooks'
 
 import DriverQueue from './pages/driver/DriverQueue'
 import DriverOrderDetail from './pages/driver/DriverOrderDetail'
@@ -25,6 +28,7 @@ import AdminCustomers from './pages/admin/Customers'
 import AdminSettings from './pages/admin/Settings'
 import Analytics from './pages/admin/Analytics'
 import LiveMap from './pages/admin/LiveMap'
+import AdminDisputes from './pages/admin/Disputes'
 
 export default function App() {
   return (
@@ -36,11 +40,14 @@ export default function App() {
         <Route path="/auth/callback"  element={<AuthCallback />} />
 
         <Route element={<CustomerLayout />}>
-          <Route path="/"         element={<Home />} />
-          <Route path="/order"    element={<CreateOrder />} />
-          <Route path="/tracking" element={<OrderTracking />} />
-          <Route path="/history"  element={<OrderHistory />} />
-          <Route path="/profile"  element={<Profile />} />
+          <Route path="/"                       element={<Home />} />
+          <Route path="/order"                  element={<CreateOrder />} />
+          <Route path="/tracking"               element={<OrderTracking />} />
+          <Route path="/history"                element={<OrderHistory />} />
+          <Route path="/profile"                element={<Profile />} />
+          <Route path="/dispute"                element={<DisputeForm />} />
+          <Route path="/enterprise/billing"     element={<EnterpriseBilling />} />
+          <Route path="/enterprise/webhooks"    element={<EnterpriseWebhooks />} />
         </Route>
 
         <Route element={<DriverRoute />}>
@@ -51,13 +58,14 @@ export default function App() {
 
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index            element={<Dashboard />} />
-            <Route path="orders"    element={<AdminOrders />} />
-            <Route path="drivers"   element={<AdminDrivers />} />
-            <Route path="map"       element={<LiveMap />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="customers" element={<AdminCustomers />} />
-            <Route path="settings"  element={<AdminSettings />} />
+            <Route index             element={<Dashboard />} />
+            <Route path="orders"     element={<AdminOrders />} />
+            <Route path="drivers"    element={<AdminDrivers />} />
+            <Route path="map"        element={<LiveMap />} />
+            <Route path="analytics"  element={<Analytics />} />
+            <Route path="customers"  element={<AdminCustomers />} />
+            <Route path="disputes"   element={<AdminDisputes />} />
+            <Route path="settings"   element={<AdminSettings />} />
           </Route>
         </Route>
       </Routes>

@@ -5,6 +5,7 @@ import prisma from '../lib/prisma'
 import { requireDriver, AuthRequest } from '../middleware/requireAuth'
 import { serializeOrder } from '../lib/serializer'
 import { sendLineMessage } from '../lib/lineMessaging'
+import { triggerWebhooks } from '../lib/webhook'
 
 const router = Router()
 const flatOrder = serializeOrder
@@ -112,37 +113,64 @@ router.patch('/orders/:id/status', requireDriver, async (req: AuthRequest, res) 
     await notifyUser(order.userId, status === 'completed' ? 'success' : 'info', title, body, order.id)
   }
 
+  triggerWebhooks('order.status_changed', { ...flatOrder(updated), new_status: status }, updated.enterpriseId).catch(() => {})
+
   res.json(flatOrder(updated))
 })
 
-// Driver's own earnings summary
+// Driver's own earnings summary (supports ?year=&month= for monthly filter)
 router.get('/me/earnings', requireDriver, async (req: AuthRequest, res) => {
   const driverId = req.user!.id
+  const year  = parseInt(req.query.year  as string) || new Date().getFullYear()
+  const month = parseInt(req.query.month as string) // 1-12; omit for all-time
+
+  let dateFilter: Record<string, unknown> = {}
+  if (month >= 1 && month <= 12) {
+    dateFilter = { createdAt: { gte: new Date(year, month - 1, 1), lt: new Date(year, month, 1) } }
+  }
+
   const orders = await prisma.order.findMany({
-    where: { driverId, status: 'completed' },
-    select: { id: true, totalFee: true, createdAt: true, serviceType: true },
+    where: { driverId, status: 'completed', ...dateFilter },
+    select: {
+      id: true, totalFee: true, createdAt: true, serviceType: true,
+      distance: true, duration: true, pickupAddress: true, deliveryAddress: true,
+    },
     orderBy: { createdAt: 'desc' },
   })
-  const gross = orders.reduce((s, o) => s + o.totalFee, 0)
+  const gross       = orders.reduce((s, o) => s + o.totalFee, 0)
   const driverShare = Math.round(gross * 0.8)
 
-  // Last 7 days breakdown
   const byDay: Record<string, number> = {}
   for (const o of orders) {
     const key = o.createdAt.toISOString().slice(0, 10)
     byDay[key] = (byDay[key] || 0) + Math.round(o.totalFee * 0.8)
   }
 
-  const ratings = await prisma.rating.aggregate({ where: { driverId }, _avg: { score: true }, _count: { id: true } })
+  const ratings = await prisma.rating.aggregate({
+    where: { driverId },
+    _avg: { score: true },
+    _count: { id: true },
+  })
+
+  // Available months that have at least one completed order
+  const allOrders = await prisma.order.findMany({
+    where: { driverId, status: 'completed' },
+    select: { createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  const monthsSet = new Set(allOrders.map(o => o.createdAt.toISOString().slice(0, 7)))
+  const availableMonths = Array.from(monthsSet).sort().reverse()
 
   res.json({
-    total_orders: orders.length,
+    total_orders:     orders.length,
     gross,
-    driver_share: driverShare,
-    avg_rating: ratings._avg.score ?? 5.0,
-    rating_count: ratings._count.id,
-    by_day: byDay,
-    recent: orders.slice(0, 10),
+    driver_share:     driverShare,
+    avg_rating:       ratings._avg.score ?? 5.0,
+    rating_count:     ratings._count.id,
+    by_day:           byDay,
+    trips:            orders,
+    available_months: availableMonths,
+    period:           { year, month: month || null },
   })
 })
 

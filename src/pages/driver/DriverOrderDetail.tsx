@@ -48,6 +48,19 @@ export default function DriverOrderDetail() {
     return () => { socket.off('order:update', handler) }
   }, [id])
 
+  // Broadcast GPS position while order is active
+  useEffect(() => {
+    if (!order || ['completed', 'cancelled'].includes(order.status)) return
+    if (!navigator.geolocation) return
+    const socket = getSocket()
+    const watchId = navigator.geolocation.watchPosition(
+      pos => socket.emit('driver:location', { lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [order?.status])
+
   const updateStatus = async () => {
     if (!order || !NEXT_ACTION[order.status]) return
     setUpdating(true)

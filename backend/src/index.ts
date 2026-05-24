@@ -16,6 +16,8 @@ import adminRouter       from './routes/admin'
 import driversRouter     from './routes/drivers'
 import uploadRouter      from './routes/upload'
 import paymentsRouter    from './routes/payments'
+import disputesRouter    from './routes/disputes'
+import webhooksRouter    from './routes/webhooks'
 import { setupSocketIO } from './socket'
 import prisma from './lib/prisma'
 import { serializeOrder } from './lib/serializer'
@@ -79,6 +81,8 @@ app.use('/api/admin',       adminRouter)
 app.use('/api/drivers',     driversRouter)
 app.use('/api/upload',      uploadRouter)
 app.use('/api/payments',    paymentsRouter)
+app.use('/api/disputes',    disputesRouter)
+app.use('/api/webhooks',    webhooksRouter)
 
 // Serve uploaded files
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')

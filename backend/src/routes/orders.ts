@@ -7,6 +7,7 @@ import { serializeOrder, serializeRecurring } from '../lib/serializer'
 import { getFeeConfig } from '../lib/settings'
 import { calcDistance } from '../lib/maps'
 import { sendEmail, orderStatusEmail } from '../lib/email'
+import { triggerWebhooks } from '../lib/webhook'
 
 const router = Router()
 
@@ -152,6 +153,10 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     io.to(`user:${req.user!.id}`).emit('order:update', flatOrder(order))
     if (initialStatus === 'matching') io.to('drivers').emit('order:new', flatOrder(order))
   }
+
+  // Trigger enterprise webhooks
+  const serialized = flatOrder(order)
+  if (serialized) triggerWebhooks('order.created', serialized, order.enterpriseId).catch(() => {})
 
   res.json(flatOrder(order))
 })
