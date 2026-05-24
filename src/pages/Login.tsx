@@ -54,6 +54,12 @@ export default function Login() {
         <p className="text-center text-white/30 text-xs mt-8 leading-relaxed">
           登入即同意 Ufly 服務條款與隱私政策
         </p>
+
+        <div className="mt-6 text-center">
+          <a href="/driver/login" className="text-white/30 text-xs hover:text-white/60 transition-colors">
+            任務夥伴（司機）登入 →
+          </a>
+        </div>
       </div>
     </div>
   )

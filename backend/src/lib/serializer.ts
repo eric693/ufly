@@ -39,6 +39,7 @@ export function serializeDriver(d: any) {
   return {
     id:           d.id,
     name:         d.name,
+    email:        d.email,
     phone:        d.phone,
     area:         d.area,
     status:       d.status,

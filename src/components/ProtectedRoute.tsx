@@ -20,6 +20,6 @@ export function DriverRoute() {
       <Loader2 size={24} className="animate-spin text-paper-400" />
     </div>
   )
-  if (!user || user.role !== 'driver') return <Navigate to="/login" replace />
+  if (!user || user.role !== 'driver') return <Navigate to="/driver/login" replace />
   return <Outlet />
 }

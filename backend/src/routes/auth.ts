@@ -9,12 +9,28 @@ const router = Router()
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173'
 const API_URL  = process.env.API_URL      || 'http://localhost:3001'
 
-function makeToken(user: { id: string; name: string; email?: string | null; avatar?: string | null; role: string }) {
+function makeToken(payload: { id: string; name: string; role: string; email?: string | null; avatar?: string | null }) {
   return jwt.sign(
-    { id: user.id, name: user.name, email: user.email, avatar: user.avatar, role: user.role },
+    { id: payload.id, name: payload.name, role: payload.role, email: payload.email, avatar: payload.avatar },
     process.env.JWT_SECRET!,
     { expiresIn: '30d' }
   )
+}
+
+async function findDriverByOAuth(params: { google_id?: string; line_id?: string; email?: string }) {
+  if (params.google_id) {
+    const d = await prisma.driver.findUnique({ where: { googleId: params.google_id } })
+    if (d) return d
+  }
+  if (params.line_id) {
+    const d = await prisma.driver.findUnique({ where: { lineId: params.line_id } })
+    if (d) return d
+  }
+  if (params.email) {
+    const d = await prisma.driver.findUnique({ where: { email: params.email } })
+    if (d) return d
+  }
+  return null
 }
 
 async function findOrCreateUser(params: {
@@ -76,6 +92,13 @@ router.get('/google/callback', async (req, res) => {
     const { data: profile } = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
+    // Check if this Google account belongs to a registered driver
+    const driver = await findDriverByOAuth({ google_id: profile.id, email: profile.email })
+    if (driver) {
+      await prisma.driver.update({ where: { id: driver.id }, data: { googleId: profile.id } })
+      res.redirect(`${FRONTEND}/auth/callback?token=${makeToken({ id: driver.id, name: driver.name, role: 'driver' })}`)
+      return
+    }
     const user = await findOrCreateUser({ google_id: profile.id, name: profile.name, email: profile.email, avatar: profile.picture })
     res.redirect(`${FRONTEND}/auth/callback?token=${makeToken(user)}`)
   } catch (e: any) {
@@ -113,6 +136,13 @@ router.get('/line/callback', async (req, res) => {
     const { data: profile } = await axios.get('https://api.line.me/v2/profile', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
+    // Check if this LINE account belongs to a registered driver
+    const driver = await findDriverByOAuth({ line_id: profile.userId })
+    if (driver) {
+      await prisma.driver.update({ where: { id: driver.id }, data: { lineId: profile.userId } })
+      res.redirect(`${FRONTEND}/auth/callback?token=${makeToken({ id: driver.id, name: driver.name, role: 'driver' })}`)
+      return
+    }
     const user = await findOrCreateUser({ line_id: profile.userId, name: profile.displayName, avatar: profile.pictureUrl })
     res.redirect(`${FRONTEND}/auth/callback?token=${makeToken(user)}`)
   } catch (e: any) {
@@ -121,12 +151,39 @@ router.get('/line/callback', async (req, res) => {
   }
 })
 
+// POST /api/auth/driver  — driver login by phone number
+router.post('/driver', async (req, res) => {
+  const { phone } = req.body
+  if (!phone) { res.status(400).json({ error: '請輸入電話號碼' }); return }
+  const driver = await prisma.driver.findFirst({ where: { phone: phone.trim() } })
+  if (!driver) { res.status(404).json({ error: '找不到此電話的司機帳號，請聯絡管理員' }); return }
+  const token = jwt.sign(
+    { id: driver.id, name: driver.name, role: 'driver' },
+    process.env.JWT_SECRET!,
+    { expiresIn: '30d' }
+  )
+  res.json({ token })
+})
+
 // GET /api/auth/me
 router.get('/me', async (req, res) => {
   const auth = req.headers.authorization
   if (!auth?.startsWith('Bearer ')) { res.json(null); return }
   try {
-    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as { id: string }
+    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as { id: string; role?: string }
+
+    // Driver token — look up in drivers table
+    if (payload.role === 'driver') {
+      const driver = await prisma.driver.findUnique({ where: { id: payload.id } })
+      if (!driver) { res.json(null); return }
+      res.json({
+        id: driver.id, name: driver.name, role: 'driver',
+        email: null, phone: driver.phone, avatar: null,
+        rating: Number(driver.rating), total_orders: driver.totalTrips,
+      })
+      return
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
       select: { id: true, name: true, email: true, phone: true, avatar: true, role: true, rating: true, totalOrders: true, referralCode: true, createdAt: true },

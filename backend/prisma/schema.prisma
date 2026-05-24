@@ -36,7 +36,10 @@ model User {
 model Driver {
   id         String   @id @default(uuid())
   name       String
+  email      String?  @unique
   phone      String?
+  googleId   String?  @unique @map("google_id")
+  lineId     String?  @unique @map("line_id")
   area       String?
   status     String   @default("offline")
   rating     Float    @default(5.0)

@@ -7,8 +7,8 @@ const STATUS_CLASS: Record<string, string> = {
   online: 'admin-badge-green', busy: 'admin-badge-yellow', offline: 'admin-badge-gray',
 }
 
-type DriverForm = { name: string; phone: string; area: string }
-const EMPTY_FORM: DriverForm = { name: '', phone: '', area: '' }
+type DriverForm = { name: string; phone: string; area: string; email: string }
+const EMPTY_FORM: DriverForm = { name: '', phone: '', area: '', email: '' }
 
 export default function AdminDrivers() {
   const [drivers, setDrivers]   = useState<any[]>([])
@@ -51,7 +51,7 @@ export default function AdminDrivers() {
   }
 
   const openAdd = () => { setForm(EMPTY_FORM); setModal('add') }
-  const openEdit = (d: any) => { setForm({ name: d.name, phone: d.phone || '', area: d.area || '' }); setEditTarget(d); setModal('edit') }
+  const openEdit = (d: any) => { setForm({ name: d.name, phone: d.phone || '', area: d.area || '', email: d.email || '' }); setEditTarget(d); setModal('edit') }
   const closeModal = () => { setModal(null); setEditTarget(null) }
 
   const save = async () => {
@@ -208,6 +208,16 @@ export default function AdminDrivers() {
                   placeholder="例：信義區"
                   value={form.area}
                   onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Google / LINE Email（供 OAuth 登入）</label>
+                <input
+                  type="email"
+                  className="w-full bg-surface-800 border border-surface-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-white transition-colors"
+                  placeholder="例：driver@gmail.com"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 />
               </div>
             </div>

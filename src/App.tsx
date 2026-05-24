@@ -13,6 +13,7 @@ import AuthCallback from './pages/AuthCallback'
 
 import DriverQueue from './pages/driver/DriverQueue'
 import DriverOrderDetail from './pages/driver/DriverOrderDetail'
+import DriverLogin from './pages/driver/DriverLogin'
 import { AdminRoute, DriverRoute } from './components/ProtectedRoute'
 
 import Dashboard from './pages/admin/Dashboard'
@@ -28,6 +29,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login"          element={<Login />} />
+        <Route path="/driver/login"   element={<DriverLogin />} />
         <Route path="/auth/callback"  element={<AuthCallback />} />
 
         <Route element={<CustomerLayout />}>

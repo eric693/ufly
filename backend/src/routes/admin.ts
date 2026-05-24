@@ -91,19 +91,24 @@ router.get('/drivers', requireAdmin, async (_req, res) => {
 })
 
 router.post('/drivers', requireAdmin, async (req, res) => {
-  const { name, phone, area } = req.body
+  const { name, phone, area, email } = req.body
   if (!name) { res.status(400).json({ error: '請填寫姓名' }); return }
   const driver = await prisma.driver.create({
-    data: { id: uuidv4(), name, phone: phone || null, area: area || null, status: 'offline' },
+    data: { id: uuidv4(), name, phone: phone || null, area: area || null, email: email || null, status: 'offline' },
   })
   res.json(serializeDriver(driver))
 })
 
 router.put('/drivers/:id', requireAdmin, async (req, res) => {
-  const { name, phone, area } = req.body
+  const { name, phone, area, email } = req.body
   const driver = await prisma.driver.update({
     where: { id: req.params.id },
-    data: { ...(name ? { name } : {}), ...(phone !== undefined ? { phone } : {}), ...(area !== undefined ? { area } : {}) },
+    data: {
+      ...(name ? { name } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      ...(area !== undefined ? { area } : {}),
+      ...(email !== undefined ? { email: email || null } : {}),
+    },
   })
   res.json(serializeDriver(driver))
 })
