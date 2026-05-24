@@ -184,7 +184,7 @@ router.get('/me', async (req, res) => {
   const auth = req.headers.authorization
   if (!auth?.startsWith('Bearer ')) { res.json(null); return }
   try {
-    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as { id: string; role?: string }
+    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as { id: string; role?: string }
 
     // Driver token — look up in drivers table
     if (payload.role === 'driver') {

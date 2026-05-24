@@ -27,19 +27,21 @@ router.get('/stats', requireAdmin, async (_req, res) => {
 })
 
 router.get('/orders', requireAdmin, async (req, res) => {
-  const { status, page = '1', limit = '20' } = req.query as Record<string, string>
+  const { status } = req.query as Record<string, string>
+  const page  = Math.max(1, parseInt(req.query.page  as string) || 1)
+  const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 20), 200)
   const where = status ? { status } : {}
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
       where,
       include: { user: { select: { name: true } }, driver: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
-      take: parseInt(limit),
-      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: limit,
+      skip: (page - 1) * limit,
     }),
     prisma.order.count({ where }),
   ])
-  res.json({ orders: orders.map(serializeOrder), total, page: parseInt(page), limit: parseInt(limit) })
+  res.json({ orders: orders.map(serializeOrder), total, page, limit })
 })
 
 router.put('/orders/:id/status', requireAdmin, async (req, res) => {
@@ -132,7 +134,7 @@ router.get('/analytics/weekly', requireAdmin, async (_req, res) => {
 })
 
 router.get('/analytics/daily', requireAdmin, async (req, res) => {
-  const numDays = Math.min(parseInt((req.query.days as string) || '7'), 90)
+  const numDays = Math.min(Math.max(1, parseInt((req.query.days as string) || '7')), 30)
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - (numDays - 1))
   startDate.setHours(0, 0, 0, 0)
@@ -213,9 +215,18 @@ router.get('/settings', requireAdmin, (_req, res) => {
   res.json(readSettings())
 })
 
+const ALLOWED_SETTING_KEYS = new Set([
+  'platformName','serviceArea','baseFee','expressSurcharge','prioritySurcharge',
+  'urgentSurcharge','notifyNewOrder','notifyDriverMatch','notifyOrderComplete',
+  'maxOrderDistance','autoMatchRadius',
+])
+
 router.put('/settings', requireAdmin, (req, res) => {
   try {
-    res.json(writeSettings(req.body))
+    const safe = Object.fromEntries(
+      Object.entries(req.body).filter(([k]) => ALLOWED_SETTING_KEYS.has(k))
+    )
+    res.json(writeSettings(safe))
   } catch { res.status(500).json({ error: 'Failed to save settings' }) }
 })
 

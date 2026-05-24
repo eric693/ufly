@@ -22,7 +22,6 @@ const SPEED_OPTIONS = [
   { id: 'urgent'   as SpeedTier, label: '急件',   description: '最速服務', timeRange: '15–30 分鐘', surcharge: 150, icon: Clock },
 ]
 
-const VALID_PROMOS: Record<string, number> = { 'UFLY50': 50, 'NEW100': 100, 'VIP200': 200 }
 
 type Step = 'info' | 'speed' | 'confirm'
 
@@ -44,6 +43,7 @@ export default function CreateOrder() {
   const [promoInput, setPromoInput]     = useState('')
   const [promoApplied, setPromoApplied] = useState<string | null>(null)
   const [promoError, setPromoError]     = useState('')
+  const [promoChecking, setPromoChecking] = useState(false)
   const [savedAddrs, setSavedAddrs]     = useState<SavedAddr[]>([])
   const [estimate, setEstimate]         = useState<Estimate | null>(null)
   const [estimating, setEstimating]     = useState(false)
@@ -69,10 +69,16 @@ export default function CreateOrder() {
 
   const canProceed = form.pickupAddress && form.pickupPhone && form.deliveryAddress && form.deliveryPhone && form.itemContent
 
-  const applyPromo = () => {
+  const applyPromo = async () => {
     const code = promoInput.trim().toUpperCase()
-    if (VALID_PROMOS[code]) { setPromoApplied(code); setPromoError('') }
-    else { setPromoError('折扣碼無效或已過期'); setPromoApplied(null) }
+    if (!code) return
+    setPromoChecking(true)
+    try {
+      const { data } = await api.post('/orders/estimate', { speed_tier: speed, promo_code: code })
+      if (data.valid_promo) { setPromoApplied(code); setPromoError('') }
+      else { setPromoError('折扣碼無效或已過期'); setPromoApplied(null) }
+    } catch { setPromoError('驗證失敗，請稍後再試') }
+    finally { setPromoChecking(false) }
   }
 
   const handleSubmit = async () => {
@@ -279,7 +285,7 @@ export default function CreateOrder() {
                   <div className="flex items-center gap-2">
                     <Check size={14} className="text-emerald-600" />
                     <span className="text-emerald-700 font-semibold text-sm">{promoApplied}</span>
-                    <span className="text-paper-500 text-sm">折抵 NT${VALID_PROMOS[promoApplied]}</span>
+                    {estimate?.discount ? <span className="text-paper-500 text-sm">折抵 NT${estimate.discount}</span> : null}
                   </div>
                   <button onClick={() => { setPromoApplied(null); setPromoInput('') }}><X size={14} /></button>
                 </div>
@@ -289,7 +295,9 @@ export default function CreateOrder() {
                     placeholder="輸入折扣碼" value={promoInput}
                     onChange={e => { setPromoInput(e.target.value); setPromoError('') }}
                     onKeyDown={e => e.key === 'Enter' && applyPromo()} />
-                  <button onClick={applyPromo} className="px-4 py-2.5 bg-white hover:bg-paper-100 border border-paper-200 rounded-xl text-sm font-medium transition-colors">套用</button>
+                  <button onClick={applyPromo} disabled={promoChecking} className="px-4 py-2.5 bg-white hover:bg-paper-100 border border-paper-200 rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+                    {promoChecking ? <Loader2 size={14} className="animate-spin" /> : '套用'}
+                  </button>
                 </div>
               )}
               {promoError && <div className="text-red-400 text-xs mt-1.5">{promoError}</div>}

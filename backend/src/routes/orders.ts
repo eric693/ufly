@@ -86,13 +86,15 @@ router.post('/estimate', requireAuth, async (req: AuthRequest, res) => {
 })
 
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
-  const { status, limit = '50', offset = '0' } = req.query as Record<string, string>
+  const { status } = req.query as Record<string, string>
+  const limit  = Math.min(Math.max(1, parseInt(req.query.limit  as string) || 50), 200)
+  const offset = Math.max(0, parseInt(req.query.offset as string) || 0)
   const orders = await prisma.order.findMany({
     where: { userId: req.user!.id, ...(status ? { status } : {}) },
     include: { driver: { select: { name: true, phone: true, rating: true } } },
     orderBy: { createdAt: 'desc' },
-    take: parseInt(limit),
-    skip: parseInt(offset),
+    take: limit,
+    skip: offset,
   })
   res.json(orders.map(flatOrder))
 })
@@ -100,6 +102,10 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 router.post('/', requireAuth, async (req: AuthRequest, res) => {
   const { service_type, pickup_address, pickup_phone, delivery_address, delivery_phone, item_content, item_note, speed_tier = 'standard', promo_code, scheduled_at } = req.body
   if (!pickup_address || !delivery_address) { res.status(400).json({ error: '請填寫地址' }); return }
+  if (typeof pickup_address !== 'string' || pickup_address.length > 300) { res.status(400).json({ error: '取件地址過長' }); return }
+  if (typeof delivery_address !== 'string' || delivery_address.length > 300) { res.status(400).json({ error: '送達地址過長' }); return }
+  if (item_content && typeof item_content === 'string' && item_content.length > 500) { res.status(400).json({ error: '物品說明過長（上限 500 字）' }); return }
+  if (scheduled_at && new Date(scheduled_at) <= new Date()) { res.status(400).json({ error: '排程時間必須在未來' }); return }
 
   const distance = estimateDistance()
 

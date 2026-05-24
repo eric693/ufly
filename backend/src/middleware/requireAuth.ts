@@ -10,7 +10,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   const auth = req.headers.authorization
   if (!auth?.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return }
   try {
-    req.user = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as AuthRequest['user']
+    req.user = jwt.verify(auth.slice(7), process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as AuthRequest['user']
     next()
   } catch {
     res.status(401).json({ error: 'Invalid token' })

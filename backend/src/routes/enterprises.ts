@@ -49,12 +49,11 @@ router.post('/mine/invite', requireAuth, async (req: AuthRequest, res) => {
 })
 
 router.get('/', requireAdmin, async (_req, res) => {
-  const rows = await prisma.enterprise.findMany({ orderBy: { createdAt: 'desc' } })
-  const result = await Promise.all(rows.map(async e => {
-    const member_count = await prisma.user.count({ where: { enterpriseId: e.id } })
-    return { ...e, member_count }
-  }))
-  res.json(result)
+  const rows = await prisma.enterprise.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { members: true } } },
+  })
+  res.json(rows.map(({ _count, ...e }) => ({ ...e, member_count: _count.members })))
 })
 
 export default router
