@@ -23,12 +23,12 @@ export default function AdminCustomers() {
     <div className="animate-fade-in space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">客戶管理</h1>
-        <div className="text-surface-400 text-sm">共 {MOCK_CUSTOMERS.length} 位客戶</div>
+        <div className="text-gray-400 text-sm">共 {MOCK_CUSTOMERS.length} 位客戶</div>
       </div>
 
       {/* Search */}
       <div className="flex items-center gap-2 bg-surface-800 border border-surface-700 rounded-xl px-3 py-2 max-w-md">
-        <Search size={16} className="text-surface-400" />
+        <Search size={16} className="text-gray-400" />
         <input
           className="bg-transparent text-sm placeholder-surface-400 text-white outline-none flex-1"
           placeholder="搜尋客戶姓名或電話..."
@@ -43,7 +43,7 @@ export default function AdminCustomers() {
           <thead>
             <tr className="border-b border-surface-700">
               {['客戶', '電話', '訂單數', '上次下單', '累計消費'].map(h => (
-                <th key={h} className="text-left px-5 py-3.5 text-surface-400 text-xs font-semibold uppercase tracking-wider">
+                <th key={h} className="text-left px-5 py-3.5 text-gray-400 text-xs font-semibold uppercase tracking-wider">
                   {h}
                 </th>
               ))}
@@ -60,12 +60,12 @@ export default function AdminCustomers() {
                     <span className="font-medium text-sm">{c.name}</span>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-sm text-surface-300">{c.phone}</td>
+                <td className="px-5 py-4 text-sm text-gray-300">{c.phone}</td>
                 <td className="px-5 py-4">
                   <span className="font-semibold text-sm">{c.orders}</span>
-                  <span className="text-surface-400 text-sm"> 筆</span>
+                  <span className="text-gray-400 text-sm"> 筆</span>
                 </td>
-                <td className="px-5 py-4 text-sm text-surface-300">{c.lastOrder}</td>
+                <td className="px-5 py-4 text-sm text-gray-300">{c.lastOrder}</td>
                 <td className="px-5 py-4 font-semibold text-white text-sm">NT${c.totalSpend.toLocaleString()}</td>
               </tr>
             ))}
@@ -81,14 +81,14 @@ export default function AdminCustomers() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium">{c.name}</div>
-                <div className="flex items-center gap-3 text-xs text-surface-400 mt-0.5">
+                <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
                   <span className="flex items-center gap-1"><Phone size={10} /> {c.phone}</span>
                   <span className="flex items-center gap-1"><Package size={10} /> {c.orders} 筆</span>
                 </div>
               </div>
               <div className="text-right">
                 <div className="font-bold text-white text-sm">NT${c.totalSpend.toLocaleString()}</div>
-                <div className="text-surface-500 text-xs flex items-center gap-1 justify-end mt-0.5">
+                <div className="text-gray-400 text-xs flex items-center gap-1 justify-end mt-0.5">
                   <Clock size={9} /> {c.lastOrder}
                 </div>
               </div>

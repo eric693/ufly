@@ -41,41 +41,41 @@ export default function Home() {
   return (
     <div className="animate-fade-in">
       {/* Dark hero */}
-      <section className="bg-paper-900 px-4 pt-6 pb-8 md:px-8">
+      <section className="bg-black px-4 pt-8 pb-8 md:px-8">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl md:text-4xl font-black text-paper-900 mb-1">
+          <h1 className="text-3xl md:text-4xl font-black text-white mb-1">
             今天需要 Ufly<br />幫你處理什麼？
           </h1>
-          <p className="text-paper-400 text-sm mb-5">快速下單 · 專人完成 · 安全可靠</p>
+          <p className="text-white/50 text-sm mb-5">快速下單 · 專人完成 · 安全可靠</p>
 
           {/* Search bar */}
           <div className="relative mb-3">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-paper-500" />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-paper-400" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="輸入取件或送達地址…"
-              className="w-full bg-white rounded-2xl pl-11 pr-4 py-3.5 text-sm text-paper-900
+              className="w-full bg-white rounded-2xl pl-11 pr-16 py-3.5 text-sm text-paper-900
                          placeholder-paper-400 outline-none shadow-card-lg"
             />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-paper-200 rounded-xl px-2 py-1 text-xs text-paper-600">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-paper-100 rounded-xl px-2 py-1 text-xs text-paper-500">
               稍後
             </div>
           </div>
 
           {/* Saved places */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {SAVED_PLACES.map(p => (
               <Link key={p.label} to={`/order?dest=${encodeURIComponent(p.address)}`}
-                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 rounded-2xl px-4 py-3 transition-colors">
+                className="flex items-center gap-3 bg-white/8 hover:bg-white/12 border border-white/10 rounded-2xl px-4 py-3 transition-colors">
                 <div className="w-8 h-8 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <p.icon size={15} className="text-paper-900" />
+                  <p.icon size={15} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-paper-900 text-sm font-medium">{p.label}</div>
-                  <div className="text-paper-400 text-xs truncate">{p.address}</div>
+                  <div className="text-white text-sm font-semibold">{p.label}</div>
+                  <div className="text-white/50 text-xs truncate">{p.address}</div>
                 </div>
-                <ChevronRight size={14} className="text-paper-500" />
+                <ChevronRight size={14} className="text-white/40" />
               </Link>
             ))}
           </div>
@@ -139,10 +139,10 @@ export default function Home() {
           <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
             {PROMOS.map(p => (
               <div key={p.title}
-                className={`flex-shrink-0 w-64 rounded-2xl bg-gradient-to-br ${p.color} p-4 text-paper-900`}>
-                <span className="badge bg-white/20 text-paper-900 text-[10px] mb-2">{p.tag}</span>
+                className={`flex-shrink-0 w-64 rounded-2xl bg-gradient-to-br ${p.color} p-4 text-white`}>
+                <span className="badge bg-white/20 text-white text-[10px] mb-2">{p.tag}</span>
                 <div className="font-bold text-sm leading-snug mb-1">{p.title}</div>
-                <div className="text-paper-900/75 text-xs">{p.desc}</div>
+                <div className="text-white/75 text-xs">{p.desc}</div>
                 <button className="mt-3 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors">
                   查看優惠內容 →
                 </button>

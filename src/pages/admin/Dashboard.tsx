@@ -6,8 +6,8 @@ import {
 import { DASHBOARD_STATS, MOCK_ORDERS, MOCK_DRIVERS } from '../../data/mockData'
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: 'badge-gray', matching: 'badge-blue', accepted: 'badge-yellow',
-  pickup: 'badge-yellow', delivering: 'badge-blue', completed: 'badge-green', cancelled: 'badge-red',
+  pending: 'admin-badge-gray', matching: 'admin-badge-blue', accepted: 'admin-badge-yellow',
+  pickup: 'admin-badge-yellow', delivering: 'admin-badge-blue', completed: 'admin-badge-green', cancelled: 'admin-badge-red',
 }
 const STATUS_LABEL: Record<string, string> = {
   pending: '等待媒合', matching: '媒合中', accepted: '已接單',
@@ -83,7 +83,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">儀表板</h1>
-          <p className="text-surface-400 text-sm mt-1">
+          <p className="text-surface-100 text-sm mt-1">
             {new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
         </div>
@@ -108,9 +108,9 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="text-2xl font-black">
-              {c.value}<span className="text-surface-400 text-base font-medium ml-1">{c.unit}</span>
+              {c.value}<span className="text-surface-100 text-base font-medium ml-1">{c.unit}</span>
             </div>
-            <div className="text-surface-400 text-sm mt-1">{c.label}</div>
+            <div className="text-surface-100 text-sm mt-1">{c.label}</div>
           </div>
         ))}
       </div>
@@ -134,11 +134,11 @@ export default function Dashboard() {
                     <span className="font-semibold text-sm">{o.id}</span>
                     <span className={STATUS_COLOR[o.status]}>{STATUS_LABEL[o.status]}</span>
                   </div>
-                  <div className="text-surface-400 text-xs truncate mt-0.5">{o.delivery.address}</div>
+                  <div className="text-surface-100 text-xs truncate mt-0.5">{o.delivery.address}</div>
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <div className="text-white font-semibold text-sm">NT${o.totalFee}</div>
-                  <div className="text-surface-500 text-xs">
+                  <div className="text-surface-100 text-xs">
                     {new Date(o.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
@@ -169,7 +169,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">{d.name}</div>
-                  <div className="text-surface-400 text-xs">{d.area}</div>
+                  <div className="text-surface-100 text-xs">{d.area}</div>
                 </div>
                 <div className={`text-xs font-medium ${d.status === 'online' ? 'text-white' : 'text-yellow-400'}`}>
                   {d.status === 'online' ? '空閒' : '任務中'}
@@ -179,7 +179,7 @@ export default function Dashboard() {
           </div>
           {/* Quick stats */}
           <div className="px-5 py-3 border-t border-surface-700 flex items-center justify-between bg-surface-700/30">
-            <span className="text-surface-400 text-xs">今日總出車</span>
+            <span className="text-surface-100 text-xs">今日總出車</span>
             <span className="text-white font-semibold text-sm flex items-center gap-1">
               <Zap size={12} className="text-white" /> 18 人次
             </span>

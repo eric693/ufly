@@ -25,7 +25,7 @@ export default function AdminLayout() {
   const [notifOpen, setNotifOpen]   = useState(false)
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f] flex">
+    <div className="min-h-screen bg-[#0d0d0f] text-white flex">
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       {/* Sidebar — desktop */}
@@ -36,7 +36,7 @@ export default function AdminLayout() {
           {!collapsed && <Logo size="sm" />}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg text-surface-300 hover:text-white hover:bg-surface-700 transition-colors">
+            className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-surface-700 transition-colors">
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
@@ -47,7 +47,7 @@ export default function AdminLayout() {
             return (
               <Link key={to} to={to} title={collapsed ? label : undefined}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150
-                  ${active ? 'bg-white/10 text-white' : 'text-surface-300 hover:text-white hover:bg-surface-700'}`}>
+                  ${active ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white hover:bg-surface-700'}`}>
                 <Icon size={18} className="flex-shrink-0" />
                 {!collapsed && <span className="text-sm font-medium">{label}</span>}
               </Link>
@@ -57,7 +57,7 @@ export default function AdminLayout() {
 
         <div className={`border-t border-surface-700 p-3 ${collapsed ? 'flex justify-center' : ''}`}>
           <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl
-                                   text-surface-400 hover:text-white hover:bg-surface-700 transition-colors text-sm">
+                                   text-gray-400 hover:text-white hover:bg-surface-700 transition-colors text-sm">
             <LogOut size={18} className="flex-shrink-0" />
             {!collapsed && <span>返回前台</span>}
           </Link>
@@ -71,7 +71,7 @@ export default function AdminLayout() {
           <aside className="absolute left-0 top-0 bottom-0 w-64 admin-sidebar border-r border-surface-700 flex flex-col">
             <div className="flex items-center justify-between h-16 px-4 border-b border-surface-700">
               <Logo size="sm" />
-              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg text-surface-300">
+              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg text-gray-300">
                 <X size={20} />
               </button>
             </div>
@@ -81,14 +81,14 @@ export default function AdminLayout() {
                 return (
                   <Link key={to} to={to} onClick={() => setMobileOpen(false)}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-sm
-                      ${active ? 'bg-white/10 text-white' : 'text-surface-300 hover:text-white hover:bg-surface-700'}`}>
+                      ${active ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white hover:bg-surface-700'}`}>
                     <Icon size={18} /> {label}
                   </Link>
                 )
               })}
             </nav>
             <div className="border-t border-surface-700 p-3">
-              <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-400 hover:text-white text-sm">
+              <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white text-sm">
                 <LogOut size={18} /> 返回前台
               </Link>
             </div>
@@ -100,21 +100,21 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-surface-700 bg-[#0d0d0f] flex-shrink-0">
           <div className="flex items-center gap-3">
-            <button className="md:hidden p-2 rounded-xl text-surface-300 hover:bg-surface-700"
+            <button className="md:hidden p-2 rounded-xl text-gray-300 hover:bg-surface-700"
               onClick={() => setMobileOpen(true)}>
               <Menu size={20} />
             </button>
             <div className="hidden md:flex items-center gap-2 bg-surface-800 border border-surface-700
                             rounded-xl px-3 py-2 w-64">
-              <Search size={16} className="text-surface-400" />
-              <input className="bg-transparent text-sm placeholder-surface-400 text-white outline-none w-full"
+              <Search size={16} className="text-gray-400" />
+              <input className="bg-transparent text-sm placeholder-gray-500 text-white outline-none w-full"
                      placeholder="搜尋訂單、夥伴..." />
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button onClick={() => setNotifOpen(true)}
-              className="p-2 rounded-xl text-surface-300 hover:text-white hover:bg-surface-700 relative">
+              className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-surface-700 relative">
               <Bell size={20} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-white rounded-full" />
             </button>
@@ -124,7 +124,7 @@ export default function AdminLayout() {
               </div>
               <div className="hidden sm:block">
                 <div className="text-sm font-medium">管理員</div>
-                <div className="text-surface-400 text-xs">admin@ufly.tw</div>
+                <div className="text-gray-400 text-xs">admin@ufly.tw</div>
               </div>
             </div>
           </div>

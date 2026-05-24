@@ -63,7 +63,7 @@ function BarChart({
       {/* X labels — show every nth */}
       <div className="flex gap-1 mt-1">
         {labels.map((l, i) => (
-          <div key={i} className="flex-1 text-center text-surface-500 text-[10px]"
+          <div key={i} className="flex-1 text-center text-gray-400 text-[10px]"
             style={{ display: labels.length > 12 && i % 3 !== 0 ? 'none' : 'block' }}>
             {l}
           </div>
@@ -124,7 +124,7 @@ export default function Analytics() {
             <button key={p}
               onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                ${period === p ? 'bg-surface-600 text-white' : 'text-surface-400 hover:text-white'}`}>
+                ${period === p ? 'bg-surface-600 text-white' : 'text-gray-400 hover:text-white'}`}>
               {p === '7d' ? '近7天' : p === '30d' ? '近30天' : '近90天'}
             </button>
           ))}
@@ -145,7 +145,7 @@ export default function Analytics() {
             </div>
             <div className="text-xl font-black">{c.value}</div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-surface-400 text-xs">{c.label}</span>
+              <span className="text-gray-400 text-xs">{c.label}</span>
               <span className="text-white text-xs font-medium">{c.change}</span>
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function Analytics() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-bold text-sm">每日營收趨勢</h2>
-              <div className="text-surface-400 text-xs mt-0.5">NT${totalRevenue.toLocaleString()} 本週</div>
+              <div className="text-gray-400 text-xs mt-0.5">NT${totalRevenue.toLocaleString()} 本週</div>
             </div>
             <div className="text-white text-sm font-semibold flex items-center gap-1">
               <ArrowUpRight size={14} /> +18%
@@ -167,7 +167,7 @@ export default function Analytics() {
           <LineChart data={WEEKLY_REVENUE} color="#22c55e" height={100} />
           <div className="flex gap-1 mt-2">
             {WEEKLY_LABELS.map(l => (
-              <div key={l} className="flex-1 text-center text-surface-500 text-[10px]">{l}</div>
+              <div key={l} className="flex-1 text-center text-gray-400 text-[10px]">{l}</div>
             ))}
           </div>
         </div>
@@ -177,7 +177,7 @@ export default function Analytics() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-bold text-sm">每日訂單量</h2>
-              <div className="text-surface-400 text-xs mt-0.5">{totalOrders} 筆本週</div>
+              <div className="text-gray-400 text-xs mt-0.5">{totalOrders} 筆本週</div>
             </div>
             <div className="text-blue-400 text-sm font-semibold flex items-center gap-1">
               <ArrowUpRight size={14} /> +14%
@@ -191,7 +191,7 @@ export default function Analytics() {
         <div className="bg-surface-800 border border-surface-700 rounded-2xl p-5">
           <div className="mb-4">
             <h2 className="font-bold text-sm">24 小時訂單分布</h2>
-            <div className="text-surface-400 text-xs mt-0.5">尖峰時段：{peakHour}:00–{peakHour+1}:00</div>
+            <div className="text-gray-400 text-xs mt-0.5">尖峰時段：{peakHour}:00–{peakHour+1}:00</div>
           </div>
           <BarChart data={HOURLY_ORDERS} labels={HOUR_LABELS} color="#a855f7" height={120}
             formatValue={v => `${v} 筆`} />
@@ -215,7 +215,7 @@ export default function Analytics() {
               <div key={s.label} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                  <span className="text-sm text-surface-200">{s.label}</span>
+                  <span className="text-sm text-gray-300">{s.label}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-24 bg-surface-700 rounded-full h-1.5 overflow-hidden">

@@ -90,7 +90,7 @@ export default function AdminSettings() {
 
       {/* Security */}
       <Section icon={Shield} title="安全設定">
-        <div className="text-surface-400 text-sm py-2">
+        <div className="text-gray-400 text-sm py-2">
           所有夥伴均需完成實名驗證後方可接單。<br />
           平台採用 TLS 加密傳輸，交易資料安全儲存。
         </div>
@@ -117,7 +117,7 @@ function Section({ icon: Icon, title, children }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-      <label className="text-surface-300 text-sm w-40 flex-shrink-0">{label}</label>
+      <label className="text-gray-300 text-sm w-40 flex-shrink-0">{label}</label>
       {children}
     </div>
   )

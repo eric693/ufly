@@ -5,9 +5,9 @@ import type { Driver } from '../../types'
 
 const STATUS_LABEL = { online: '在線', busy: '任務中', offline: '離線' }
 const STATUS_CLASS = {
-  online:  'badge-green',
-  busy:    'badge-yellow',
-  offline: 'badge-gray',
+  online:  'admin-badge-green',
+  busy:    'admin-badge-yellow',
+  offline: 'admin-badge-gray',
 }
 
 export default function AdminDrivers() {
@@ -41,7 +41,7 @@ export default function AdminDrivers() {
           <div key={s} className="bg-surface-800 border border-surface-700 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-1">
               <div className={s === 'online' ? 'status-online' : s === 'busy' ? 'status-busy' : 'status-offline'} />
-              <span className="text-surface-300 text-sm">{STATUS_LABEL[s]}</span>
+              <span className="text-gray-300 text-sm">{STATUS_LABEL[s]}</span>
             </div>
             <div className="text-2xl font-black">{counts[s]}</div>
           </div>
@@ -51,7 +51,7 @@ export default function AdminDrivers() {
       {/* Search & filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 bg-surface-800 border border-surface-700 rounded-xl px-3 py-2 flex-1">
-          <Search size={16} className="text-surface-400" />
+          <Search size={16} className="text-gray-400" />
           <input
             className="bg-transparent text-sm placeholder-surface-400 text-white outline-none flex-1"
             placeholder="搜尋姓名、電話、區域..."
@@ -66,7 +66,7 @@ export default function AdminDrivers() {
               className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors
                 ${filter === s
                   ? 'bg-white text-black'
-                  : 'bg-surface-800 border border-surface-700 text-surface-300 hover:text-white'}`}>
+                  : 'bg-surface-800 border border-surface-700 text-gray-300 hover:text-white'}`}>
               {s === 'all' ? '全部' : STATUS_LABEL[s]}
             </button>
           ))}
@@ -94,7 +94,7 @@ export default function AdminDrivers() {
             {/* Info */}
             <div>
               <div className="font-bold">{d.name}</div>
-              <div className="flex items-center gap-1 text-surface-400 text-xs mt-0.5">
+              <div className="flex items-center gap-1 text-gray-400 text-xs mt-0.5">
                 <MapPin size={11} /> {d.area}
               </div>
             </div>
@@ -119,11 +119,11 @@ export default function AdminDrivers() {
             <div className="flex gap-2">
               <a href={`tel:${d.phone}`}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-surface-700
-                           hover:bg-surface-600 rounded-xl py-2 text-xs text-surface-200 hover:text-white transition-colors">
+                           hover:bg-surface-600 rounded-xl py-2 text-xs text-gray-300 hover:text-white transition-colors">
                 <Phone size={13} /> 聯絡
               </a>
               <button className="flex-1 bg-surface-700 hover:bg-surface-600 rounded-xl py-2 text-xs
-                                 text-surface-200 hover:text-white transition-colors">
+                                 text-gray-300 hover:text-white transition-colors">
                 詳情
               </button>
             </div>
