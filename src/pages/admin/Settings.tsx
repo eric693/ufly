@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, MapPin, DollarSign, Bell, Shield, Globe, Loader2, Check } from 'lucide-react'
+import { Save, MapPin, DollarSign, Bell, Shield, Globe, Loader2, Check, CreditCard, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../../lib/api'
 
 const DEFAULT_SETTINGS = {
@@ -14,6 +14,15 @@ const DEFAULT_SETTINGS = {
   notifyOrderComplete: true,
   maxOrderDistance: '25',
   autoMatchRadius: '5',
+  ecpayMerchantId: '',
+  ecpayHashKey: '',
+  ecpayHashIv: '',
+  ecpayStage: true,
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: '587',
+  smtpUser: '',
+  smtpPass: '',
+  smtpFrom: '',
 }
 
 type Settings = typeof DEFAULT_SETTINGS
@@ -23,6 +32,9 @@ export default function AdminSettings() {
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
+  const [showHashKey, setShowHashKey] = useState(false)
+  const [showHashIv, setShowHashIv]   = useState(false)
+  const [showSmtpPass, setShowSmtpPass] = useState(false)
 
   useEffect(() => {
     api.get('/admin/settings')
@@ -111,6 +123,72 @@ export default function AdminSettings() {
         ))}
       </Section>
 
+      <Section icon={CreditCard} title="ECPay 綠界金流">
+        <div className="text-gray-400 text-xs mb-3 leading-relaxed">
+          前往 <span className="text-white font-mono">vendor.ecpay.com.tw</span> 申請帳號後，將以下資訊填入即可啟用線上付款。
+          空白時付款功能會顯示「金流尚未設定」。
+        </div>
+        <Field label="環境">
+          <div className="flex items-center gap-3">
+            <Toggle
+              checked={settings.ecpayStage}
+              onChange={e => setSettings(p => ({ ...p, ecpayStage: e.target.checked }))}
+            />
+            <span className="text-sm text-gray-300">
+              {settings.ecpayStage ? '測試環境（不會真實扣款）' : '正式環境（真實收款）'}
+            </span>
+          </div>
+        </Field>
+        <Field label="特店編號 MerchantID">
+          <TextInput value={settings.ecpayMerchantId} onChange={set('ecpayMerchantId')} placeholder="2000132" />
+        </Field>
+        <Field label="HashKey">
+          <PasswordInput
+            value={settings.ecpayHashKey}
+            onChange={set('ecpayHashKey')}
+            show={showHashKey}
+            onToggle={() => setShowHashKey(v => !v)}
+            placeholder="5294y06JbISpM5x9"
+          />
+        </Field>
+        <Field label="HashIV">
+          <PasswordInput
+            value={settings.ecpayHashIv}
+            onChange={set('ecpayHashIv')}
+            show={showHashIv}
+            onToggle={() => setShowHashIv(v => !v)}
+            placeholder="v77hoKGq4kWxNNIS"
+          />
+        </Field>
+      </Section>
+
+      <Section icon={Mail} title="Email 通知（SMTP）">
+        <div className="text-gray-400 text-xs mb-3 leading-relaxed">
+          設定後系統會在訂單狀態變更時寄送通知信。使用 Gmail 請先開啟「應用程式密碼」。
+        </div>
+        <Field label="SMTP 主機">
+          <TextInput value={settings.smtpHost} onChange={set('smtpHost')} placeholder="smtp.gmail.com" />
+        </Field>
+        <Field label="Port">
+          <TextInput type="number" value={settings.smtpPort} onChange={set('smtpPort')} placeholder="587" />
+        </Field>
+        <Field label="帳號（發信 Email）">
+          <TextInput value={settings.smtpUser} onChange={set('smtpUser')} placeholder="noreply@example.com" />
+        </Field>
+        <Field label="密碼 / 應用程式密碼">
+          <PasswordInput
+            value={settings.smtpPass}
+            onChange={set('smtpPass')}
+            show={showSmtpPass}
+            onToggle={() => setShowSmtpPass(v => !v)}
+            placeholder="••••••••••••••••"
+          />
+        </Field>
+        <Field label="寄件人名稱（From）">
+          <TextInput value={settings.smtpFrom} onChange={set('smtpFrom')} placeholder="Ufly 城市任務平台 <noreply@example.com>" />
+        </Field>
+      </Section>
+
       <Section icon={Shield} title="安全設定">
         <div className="text-gray-400 text-sm py-2">
           所有夥伴均需完成實名驗證後方可接單。<br />
@@ -143,13 +221,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function TextInput({ value, onChange, type = 'text' }: {
-  value: string; onChange: React.ChangeEventHandler<HTMLInputElement>; type?: string
+function TextInput({ value, onChange, type = 'text', placeholder }: {
+  value: string; onChange: React.ChangeEventHandler<HTMLInputElement>; type?: string; placeholder?: string
 }) {
   return (
-    <input type={type} value={value} onChange={onChange}
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
       className="flex-1 bg-surface-700 border border-surface-600 rounded-xl px-3 py-2
-                 text-sm text-white placeholder-surface-400 focus:border-white transition-colors outline-none" />
+                 text-sm text-white placeholder-surface-500 focus:border-white transition-colors outline-none" />
+  )
+}
+
+function PasswordInput({ value, onChange, show, onToggle, placeholder }: {
+  value: string; onChange: React.ChangeEventHandler<HTMLInputElement>
+  show: boolean; onToggle: () => void; placeholder?: string
+}) {
+  return (
+    <div className="flex-1 relative">
+      <input type={show ? 'text' : 'password'} value={value} onChange={onChange} placeholder={placeholder}
+        className="w-full bg-surface-700 border border-surface-600 rounded-xl px-3 py-2 pr-10
+                   text-sm text-white placeholder-surface-500 focus:border-white transition-colors outline-none font-mono" />
+      <button type="button" onClick={onToggle}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+        {show ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
+    </div>
   )
 }
 

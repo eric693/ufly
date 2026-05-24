@@ -1,22 +1,25 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import axios from 'axios'
 import prisma from '../lib/prisma'
 import { requireAuth, AuthRequest } from '../middleware/requireAuth'
+import { readSettings } from '../lib/settings'
 
 const router = Router()
 
-const ECPAY_MERCHANT_ID = process.env.ECPAY_MERCHANT_ID || ''
-const ECPAY_HASH_KEY    = process.env.ECPAY_HASH_KEY    || ''
-const ECPAY_HASH_IV     = process.env.ECPAY_HASH_IV     || ''
-const ECPAY_STAGE       = process.env.ECPAY_STAGE === 'false' ? false : true
-const ECPAY_BASE        = ECPAY_STAGE
-  ? 'https://payment-stage.ecpay.com.tw'
-  : 'https://payment.ecpay.com.tw'
+function getEcpayConfig() {
+  const s = readSettings()
+  return {
+    merchantId: s.ecpayMerchantId || process.env.ECPAY_MERCHANT_ID || '',
+    hashKey:    s.ecpayHashKey    || process.env.ECPAY_HASH_KEY    || '',
+    hashIv:     s.ecpayHashIv     || process.env.ECPAY_HASH_IV     || '',
+    stage:      s.ecpayMerchantId ? s.ecpayStage : (process.env.ECPAY_STAGE !== 'false'),
+  }
+}
 
 function ecpayCheckMac(params: Record<string, string>): string {
+  const { hashKey, hashIv } = getEcpayConfig()
   const sorted = Object.keys(params).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-  let raw = `HashKey=${ECPAY_HASH_KEY}&` + sorted.map(k => `${k}=${params[k]}`).join('&') + `&HashIV=${ECPAY_HASH_IV}`
+  let raw = `HashKey=${hashKey}&` + sorted.map(k => `${k}=${params[k]}`).join('&') + `&HashIV=${hashIv}`
   raw = encodeURIComponent(raw).toLowerCase()
     .replace(/%2d/g, '-').replace(/%5f/g, '_').replace(/%2e/g, '.').replace(/%21/g, '!')
     .replace(/%2a/g, '*').replace(/%28/g, '(').replace(/%29/g, ')')
@@ -43,8 +46,12 @@ router.post('/create', requireAuth, async (req: AuthRequest, res) => {
   const backendUrl = process.env.BACKEND_URL || 'https://ufly.crownai.ink'
   const frontendUrl = process.env.FRONTEND_URL || 'https://ufly.crownai.ink'
 
+  const ecpay = getEcpayConfig()
+  if (!ecpay.merchantId) { res.status(503).json({ error: '金流尚未設定，請聯絡管理員' }); return }
+  const ecpayBase = ecpay.stage ? 'https://payment-stage.ecpay.com.tw' : 'https://payment.ecpay.com.tw'
+
   const params: Record<string, string> = {
-    MerchantID: ECPAY_MERCHANT_ID,
+    MerchantID: ecpay.merchantId,
     MerchantTradeNo: merchantTradeNo,
     MerchantTradeDate: merchantTradeDate,
     PaymentType: 'aio',
@@ -65,7 +72,7 @@ router.post('/create', requireAuth, async (req: AuthRequest, res) => {
   })
 
   // Return the form data for the frontend to auto-submit
-  res.json({ action: `${ECPAY_BASE}/Cashier/AioCheckOut/V5`, params })
+  res.json({ action: `${ecpayBase}/Cashier/AioCheckOut/V5`, params })
 })
 
 // POST /api/payments/callback — ECPay server-to-server callback

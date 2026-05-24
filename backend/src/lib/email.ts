@@ -1,27 +1,26 @@
 import nodemailer from 'nodemailer'
-
-let transporter: nodemailer.Transporter | null = null
+import { readSettings } from './settings'
 
 function getTransporter() {
-  if (transporter) return transporter
-  const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASS
+  const s = readSettings()
+  const user = s.smtpUser || process.env.SMTP_USER
+  const pass = s.smtpPass || process.env.SMTP_PASS
   if (!user || !pass) return null
 
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
+  return nodemailer.createTransport({
+    host: s.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(s.smtpPort || process.env.SMTP_PORT || '587'),
     secure: false,
     auth: { user, pass },
   })
-  return transporter
 }
 
 export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const t = getTransporter()
   if (!t) return // SMTP not configured — silently skip
 
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER
+  const s = readSettings()
+  const from = s.smtpFrom || s.smtpUser || process.env.SMTP_FROM || process.env.SMTP_USER
   await t.sendMail({ from, to, subject, html })
 }
 

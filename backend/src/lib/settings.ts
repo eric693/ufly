@@ -15,6 +15,17 @@ export interface AppSettings {
   notifyOrderComplete: boolean
   maxOrderDistance: string
   autoMatchRadius: string
+  // ECPay
+  ecpayMerchantId: string
+  ecpayHashKey: string
+  ecpayHashIv: string
+  ecpayStage: boolean
+  // SMTP
+  smtpHost: string
+  smtpPort: string
+  smtpUser: string
+  smtpPass: string
+  smtpFrom: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -29,6 +40,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notifyOrderComplete: true,
   maxOrderDistance: '25',
   autoMatchRadius: '5',
+  ecpayMerchantId: '',
+  ecpayHashKey: '',
+  ecpayHashIv: '',
+  ecpayStage: true,
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: '587',
+  smtpUser: '',
+  smtpPass: '',
+  smtpFrom: '',
 }
 
 export function readSettings(): AppSettings {

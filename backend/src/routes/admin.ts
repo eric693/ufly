@@ -245,6 +245,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'platformName','serviceArea','baseFee','expressSurcharge','prioritySurcharge',
   'urgentSurcharge','notifyNewOrder','notifyDriverMatch','notifyOrderComplete',
   'maxOrderDistance','autoMatchRadius',
+  'ecpayMerchantId','ecpayHashKey','ecpayHashIv','ecpayStage',
+  'smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom',
 ])
 
 router.put('/settings', requireAdmin, (req: AuthRequest, res) => {
