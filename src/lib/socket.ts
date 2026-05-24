@@ -14,7 +14,11 @@ export function getSocket(): Socket {
   return socket
 }
 
-export function reconnectSocket() {
+export function disconnectSocket() {
   if (socket) { socket.disconnect(); socket = null }
+}
+
+export function reconnectSocket() {
+  disconnectSocket()
   return getSocket()
 }

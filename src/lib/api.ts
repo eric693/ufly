@@ -11,7 +11,13 @@ api.interceptors.request.use(cfg => {
 api.interceptors.response.use(
   r => r,
   err => {
-    if (err.response?.status === 401) localStorage.removeItem('ufly_token')
+    if (err.response?.status === 401) {
+      localStorage.removeItem('ufly_token')
+      // Don't redirect on the /auth/me probe (used to check login state on load)
+      if (!err.config?.url?.includes('/auth/me')) {
+        window.location.href = '/login'
+      }
+    }
     return Promise.reject(err)
   }
 )

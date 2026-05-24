@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import api from '../lib/api'
+import { disconnectSocket } from '../lib/socket'
 
 interface User {
   id: string
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('ufly_token')
     setUser(null)
+    disconnectSocket()
   }
 
   return (
