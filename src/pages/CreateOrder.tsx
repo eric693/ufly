@@ -44,8 +44,10 @@ function AddressSuggest({
   const [results, setResults]       = useState<NominatimResult[]>([])
   const [open, setOpen]             = useState(false)
   const [loading, setLoading]       = useState(false)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef                = useRef<HTMLDivElement>(null)
+  const inputRef                    = useRef<HTMLInputElement>(null)
 
   // Sync external value resets (e.g. saved address click)
   useEffect(() => { setQuery(value) }, [value])
@@ -76,10 +78,17 @@ function AddressSuggest({
       .finally(() => setLoading(false))
   }, [])
 
+  const updateDropdownPos = () => {
+    if (!inputRef.current) return
+    const rect = inputRef.current.getBoundingClientRect()
+    setDropdownStyle({ position: 'fixed', top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 9999 })
+  }
+
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     setQuery(v)
     onChange(v)                            // keep parent in sync as-you-type
+    updateDropdownPos()
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => search(v), 420)
   }
@@ -98,11 +107,12 @@ function AddressSuggest({
       <div className="flex items-center">
         {icon && <span className="ml-4 flex-shrink-0">{icon}</span>}
         <input
+          ref={inputRef}
           className="input-field pr-10"
           placeholder={placeholder}
           value={query}
           onChange={handleInput}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onFocus={() => { if (results.length > 0) { updateDropdownPos(); setOpen(true) } }}
           autoComplete="off"
         />
         {loading && (
@@ -111,7 +121,7 @@ function AddressSuggest({
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-paper-200 rounded-2xl shadow-card-lg overflow-hidden max-h-52 overflow-y-auto">
+        <div style={dropdownStyle} className="bg-white border border-paper-200 rounded-2xl shadow-card-lg overflow-hidden max-h-52 overflow-y-auto">
           {results.map(item => (
             <button
               key={item.place_id}

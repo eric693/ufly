@@ -6,11 +6,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:4010',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:4010',
         changeOrigin: true,
         ws: true,
       },
