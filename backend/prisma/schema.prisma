@@ -8,20 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String?  @unique
-  phone        String?
-  avatar       String?
-  googleId     String?  @unique @map("google_id")
-  lineId       String?  @unique @map("line_id")
-  role         String   @default("customer")
-  rating       Float    @default(5.0)
-  totalOrders  Int      @default(0) @map("total_orders")
-  referralCode String?  @unique @map("referral_code")
-  referralBy   String?  @map("referral_by")
-  enterpriseId String?  @map("enterprise_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  name             String
+  email            String?  @unique
+  phone            String?
+  avatar           String?
+  googleId         String?  @unique @map("google_id")
+  lineId           String?  @unique @map("line_id")
+  role             String   @default("customer")
+  rating           Float    @default(5.0)
+  totalOrders      Int      @default(0) @map("total_orders")
+  referralCode     String?  @unique @map("referral_code")
+  referralBy       String?  @map("referral_by")
+  enterpriseId     String?  @map("enterprise_id")
+  subscriptionTier String   @default("free") @map("subscription_tier") // free | pro | enterprise
+  createdAt        DateTime @default(now()) @map("created_at")
 
   enterprise      Enterprise?    @relation(fields: [enterpriseId], references: [id])
   orders          Order[]
@@ -30,8 +31,25 @@ model User {
   notifications   Notification[]
   recurringOrders RecurringOrder[]
   disputes        Dispute[]
+  subscription    Subscription?
 
   @@map("users")
+}
+
+model Subscription {
+  id           String    @id @default(uuid())
+  userId       String    @unique @map("user_id")
+  tier         String    // pro | enterprise
+  monthlyFee   Int       @map("monthly_fee")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  renewsAt     DateTime  @map("renews_at")
+  cancelledAt  DateTime? @map("cancelled_at")
+  vouchersLeft Int       @default(3) @map("vouchers_left") // Pro: 3 express-surcharge-free per month
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
 }
 
 model Driver {

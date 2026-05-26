@@ -85,15 +85,26 @@ router.post('/callback', async (req, res) => {
   try {
     if (body.RtnCode === '1') {
       const payment = await prisma.payment.findFirst({ where: { merchantTradeNo: body.MerchantTradeNo } })
-      if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'paid', tradeNo: body.TradeNo, paidAt: new Date() },
-        })
+      if (!payment) { res.send('0|Error'); return }
+
+      // Idempotency — already paid, don't double-process
+      if (payment.status === 'paid') { res.send('1|OK'); return }
+
+      // Verify amount matches what we expect
+      const order = await prisma.order.findUnique({ where: { id: payment.orderId } })
+      if (!order || Number(body.TotalAmount) !== order.totalFee) {
+        console.error(`[ecpay-callback] Amount mismatch: expected ${order?.totalFee}, got ${body.TotalAmount}`)
+        res.send('0|Error'); return
       }
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'paid', tradeNo: body.TradeNo, paidAt: new Date() },
+      })
     }
     res.send('1|OK')
-  } catch {
+  } catch (e) {
+    console.error('[ecpay-callback]', e)
     res.send('0|Error')
   }
 })

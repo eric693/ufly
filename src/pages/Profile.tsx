@@ -25,7 +25,7 @@ const SCHEDULE_LABEL: Record<string, string> = {
 
 export default function Profile() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'enterprise' | 'recurring'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'enterprise' | 'recurring' | 'subscription'>('profile')
 
   const [addresses, setAddresses]       = useState<SavedAddress[]>([])
   const [editingAddr, setEditingAddr]   = useState<string | null>(null)
@@ -49,6 +49,9 @@ export default function Profile() {
   const [addingRec, setAddingRec]       = useState(false)
   const [recForm, setRecForm]           = useState({ pickup_address: '', delivery_address: '', item_content: '', schedule: 'daily', speed_tier: 'standard', service_type: 'document' })
 
+  const [subInfo, setSubInfo]           = useState<{ tier: string; subscription: any } | null>(null)
+  const [subLoading, setSubLoading]     = useState(false)
+
   const [saving, setSaving]             = useState(false)
   const [editName, setEditName]         = useState(false)
   const [editPhone, setEditPhone]       = useState(false)
@@ -61,6 +64,7 @@ export default function Profile() {
     api.get('/enterprises/mine').then(r => setEnterprise(r.data)).catch(() => setEnterprise(null)).finally(() => setLoadingEnt(false))
     api.get('/orders/recurring/list').then(r => setRecurring(r.data)).catch(() => {})
     api.get('/users/me').then(r => { setNameVal(r.data.name); setPhoneVal(r.data.phone || '') }).catch(() => {})
+    api.get('/subscriptions/me').then(r => setSubInfo(r.data)).catch(() => {})
   }, [])
 
   const saveProfile = async () => {
@@ -163,10 +167,11 @@ export default function Profile() {
       {/* Tabs */}
       <div className="flex gap-1 bg-paper-100 rounded-2xl p-1 mb-5 overflow-x-auto">
         {[
-          { id: 'profile' as const,    label: '帳號' },
-          { id: 'addresses' as const,  label: '地址' },
-          { id: 'enterprise' as const, label: '企業' },
-          { id: 'recurring' as const,  label: '定期任務' },
+          { id: 'profile' as const,      label: '帳號' },
+          { id: 'addresses' as const,    label: '地址' },
+          { id: 'subscription' as const, label: '訂閱' },
+          { id: 'enterprise' as const,   label: '企業' },
+          { id: 'recurring' as const,    label: '定期任務' },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors whitespace-nowrap
@@ -482,6 +487,76 @@ export default function Profile() {
 
           {recurring.length === 0 && !addingRec && (
             <div className="text-center py-6 text-paper-400 text-sm">還沒有定期任務<br /><span className="text-xs">設定後系統會自動建立訂單</span></div>
+          )}
+        </div>
+      )}
+
+      {/* ── Subscription Tab ── */}
+      {activeTab === 'subscription' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Current plan badge */}
+          <div className="card text-center">
+            <div className="text-paper-500 text-xs mb-1">目前方案</div>
+            <div className={`text-2xl font-bold ${subInfo?.tier === 'pro' ? 'text-blue-600' : subInfo?.tier === 'enterprise' ? 'text-purple-600' : 'text-paper-900'}`}>
+              {subInfo?.tier === 'pro' ? 'Pro' : subInfo?.tier === 'enterprise' ? 'Enterprise' : 'Free'}
+            </div>
+            {subInfo?.subscription && (
+              <div className="text-xs text-paper-400 mt-1">
+                到期日：{new Date(subInfo.subscription.renews_at ?? subInfo.subscription.renewsAt).toLocaleDateString('zh-TW')}
+                {' · '}剩餘優惠券：{subInfo.subscription.vouchers_left ?? subInfo.subscription.vouchersLeft} 張
+              </div>
+            )}
+          </div>
+
+          {/* Plan cards */}
+          {[
+            { tier: 'free',       name: 'Free',       price: '免費',       desc: '標準費率，無折扣', color: 'border-paper-200', badge: '' },
+            { tier: 'pro',        name: 'Pro',         price: 'NT$299/月',  desc: '8折基本費 + 每月3張免速度附加費優惠券', color: 'border-blue-400', badge: 'text-blue-600' },
+            { tier: 'enterprise', name: 'Enterprise',  price: 'NT$999/月',  desc: '7.5折基本費 + 無限優惠券 + 企業月結帳單', color: 'border-purple-400', badge: 'text-purple-600' },
+          ].map(plan => (
+            <div key={plan.tier} className={`card border-2 ${subInfo?.tier === plan.tier ? plan.color : 'border-paper-100'}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className={`font-bold text-base ${plan.badge}`}>{plan.name}</div>
+                  <div className="text-paper-900 font-semibold text-sm mt-0.5">{plan.price}</div>
+                  <div className="text-paper-500 text-xs mt-1">{plan.desc}</div>
+                </div>
+                {subInfo?.tier === plan.tier ? (
+                  <span className="text-xs bg-paper-100 text-paper-500 px-2 py-1 rounded-lg">目前方案</span>
+                ) : plan.tier !== 'free' && (
+                  <button
+                    disabled={subLoading}
+                    onClick={async () => {
+                      setSubLoading(true)
+                      try {
+                        await api.post('/subscriptions/upgrade', { tier: plan.tier })
+                        const r = await api.get('/subscriptions/me')
+                        setSubInfo(r.data)
+                        alert(`已升級至 ${plan.name} 方案！`)
+                      } catch { alert('升級失敗，請稍後再試') } finally { setSubLoading(false) }
+                    }}
+                    className="text-xs bg-paper-900 text-white px-3 py-1.5 rounded-xl font-medium">
+                    {subLoading ? '處理中...' : '升級'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {subInfo?.tier !== 'free' && (
+            <button
+              onClick={async () => {
+                if (!confirm('確定要取消訂閱？將立即降回 Free 方案')) return
+                setSubLoading(true)
+                try {
+                  await api.delete('/subscriptions/cancel')
+                  const r = await api.get('/subscriptions/me')
+                  setSubInfo(r.data)
+                } catch { alert('取消失敗') } finally { setSubLoading(false) }
+              }}
+              className="w-full text-center text-xs text-paper-400 hover:text-red-400 py-2 transition-colors">
+              取消訂閱
+            </button>
           )}
         </div>
       )}

@@ -46,7 +46,13 @@ export function setupSocketIO(io: Server) {
         if (activeOrder) {
           io.to(`user:${activeOrder.userId}`).emit('driver:locationUpdate', { driverId: user.id, lat, lng })
         }
-      } catch { /* DB transient error — skip this position update */ }
+      } catch (e) { console.error('[socket:driver:location]', e) }
+    })
+
+    socket.on('disconnect', () => {
+      socket.leave(`user:${user.id}`)
+      if (user.role === 'admin')  socket.leave('admin')
+      if (user.role === 'driver') socket.leave('drivers')
     })
   })
 

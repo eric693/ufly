@@ -52,7 +52,7 @@ export default function Dashboard() {
     { label: '今日訂單', value: stats?.todayOrders || 0,                                unit: '筆',   icon: Package,    color: 'text-blue-400 bg-blue-400/10' },
     { label: '今日營收', value: `NT$${(stats?.todayRevenue || 0).toLocaleString()}`,    unit: '',     icon: TrendingUp, color: 'text-white bg-white/8' },
     { label: '在線夥伴', value: stats?.activeDrivers || 0,                              unit: '人',   icon: Navigation, color: 'text-purple-400 bg-purple-400/10' },
-    { label: '完成率',   value: stats?.completionRate ?? 100,                           unit: '%',    icon: CheckCircle,color: 'text-white bg-white/8' },
+    { label: '完成率',   value: stats?.completionRate ?? '—',                           unit: stats?.completionRate != null ? '%' : '',    icon: CheckCircle,color: 'text-white bg-white/8' },
     { label: '待處理',   value: stats?.pendingOrders || 0,                              unit: '筆',   icon: AlertCircle,color: 'text-yellow-400 bg-yellow-400/10' },
     { label: '平均送達', value: stats?.avgDeliveryTime || '—',                          unit: stats?.avgDeliveryTime ? '分鐘' : '', icon: Clock, color: 'text-orange-400 bg-orange-400/10' },
   ]

@@ -11,6 +11,7 @@ interface User {
   role: 'customer' | 'admin' | 'driver'
   rating: number
   total_orders: number
+  subscription_tier: 'free' | 'pro' | 'enterprise'
 }
 
 interface AuthCtx {

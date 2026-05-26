@@ -7,6 +7,7 @@ export interface AppSettings {
   platformName: string
   serviceArea: string
   baseFee: string
+  feePerKm: string
   expressSurcharge: string
   prioritySurcharge: string
   urgentSurcharge: string
@@ -32,6 +33,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   platformName: 'Ufly 城市任務平台',
   serviceArea: '台北市（以中正區為主）',
   baseFee: '120',
+  feePerKm: '12',
   expressSurcharge: '30',
   prioritySurcharge: '80',
   urgentSurcharge: '150',
@@ -69,6 +71,7 @@ export function getFeeConfig() {
   const s = readSettings()
   return {
     baseFee:    parseInt(s.baseFee)            || 120,
+    feePerKm:   parseFloat(s.feePerKm)         || 12,
     surcharges: {
       standard: 0,
       express:  parseInt(s.expressSurcharge)  || 30,

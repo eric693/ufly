@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   MapPin, Phone, Package, FileText, StickyNote,
   ChevronRight, ArrowLeft, ArrowRight, Check, Navigation,
   Clock, Zap, Star, Truck, Home, Briefcase, Tag,
-  CalendarClock, X, Loader2, RefreshCw,
+  CalendarClock, X, Loader2, RefreshCw, Search,
 } from 'lucide-react'
 import type { SpeedTier, ServiceType } from '../types'
 import api from '../lib/api'
@@ -16,18 +16,177 @@ const SERVICE_LABELS: Record<string, string> = {
 }
 
 const SPEED_OPTIONS = [
-  { id: 'standard' as SpeedTier, label: '標準件', description: '彈性安排', timeRange: '60–90 分鐘', surcharge: 0, icon: Truck },
-  { id: 'express'  as SpeedTier, label: '快速件', description: '即時媒合', timeRange: '45–60 分鐘', surcharge: 30, icon: Zap },
-  { id: 'priority' as SpeedTier, label: '優先件', description: '優先處理', timeRange: '30–45 分鐘', surcharge: 80, icon: Star },
+  { id: 'standard' as SpeedTier, label: '標準件', description: '彈性安排', timeRange: '60–90 分鐘', surcharge: 0,   icon: Truck },
+  { id: 'express'  as SpeedTier, label: '快速件', description: '即時媒合', timeRange: '45–60 分鐘', surcharge: 30,  icon: Zap },
+  { id: 'priority' as SpeedTier, label: '優先件', description: '優先處理', timeRange: '30–45 分鐘', surcharge: 80,  icon: Star },
   { id: 'urgent'   as SpeedTier, label: '急件',   description: '最速服務', timeRange: '15–30 分鐘', surcharge: 150, icon: Clock },
 ]
 
-
 type Step = 'info' | 'speed' | 'confirm'
-
 interface SavedAddr { id: string; label: string; address: string; type: string }
-interface Estimate  { distance: number; base_fee: number; surcharge: number; discount: number; total_fee: number; duration: number; valid_promo?: boolean }
+interface Estimate  { distance: number; base_fee: number; surcharge: number; discount: number; total_fee: number; duration: number; valid_promo?: boolean; subscription_tier?: string; vouchers_left?: number; sub_discount?: boolean }
 
+// ── Nominatim address suggest ─────────────────────────────────────────────────
+interface NominatimResult { place_id: number; display_name: string; lat: string; lon: string }
+
+function AddressSuggest({
+  value,
+  onChange,
+  placeholder,
+  icon,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  icon?: React.ReactNode
+}) {
+  const [query, setQuery]           = useState(value)
+  const [results, setResults]       = useState<NominatimResult[]>([])
+  const [open, setOpen]             = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef                = useRef<HTMLDivElement>(null)
+
+  // Sync external value resets (e.g. saved address click)
+  useEffect(() => { setQuery(value) }, [value])
+
+  // Click-outside closes dropdown
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const search = useCallback((q: string) => {
+    if (q.trim().length < 3) { setResults([]); setOpen(false); return }
+    setLoading(true)
+    fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=tw&accept-language=zh-TW`,
+    )
+      .then(r => r.json())
+      .then((data: NominatimResult[]) => {
+        setResults(data)
+        setOpen(data.length > 0)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    setQuery(v)
+    onChange(v)                            // keep parent in sync as-you-type
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => search(v), 420)
+  }
+
+  const select = (item: NominatimResult) => {
+    // Shorten display_name to just the address portion (trim country suffix)
+    const short = item.display_name.split(', ').slice(0, -2).join(', ') || item.display_name
+    setQuery(short)
+    onChange(short)
+    setOpen(false)
+    setResults([])
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center">
+        {icon && <span className="ml-4 flex-shrink-0">{icon}</span>}
+        <input
+          className="input-field pr-10"
+          placeholder={placeholder}
+          value={query}
+          onChange={handleInput}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          autoComplete="off"
+        />
+        {loading && (
+          <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-paper-400" />
+        )}
+      </div>
+
+      {open && results.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-paper-200 rounded-2xl shadow-card-lg overflow-hidden max-h-52 overflow-y-auto">
+          {results.map(item => (
+            <button
+              key={item.place_id}
+              type="button"
+              onMouseDown={() => select(item)}  // mousedown fires before blur
+              className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-paper-50 transition-colors border-b border-paper-100 last:border-0"
+            >
+              <MapPin size={14} className="text-paper-400 flex-shrink-0 mt-0.5" />
+              <span className="text-sm text-paper-900 leading-snug line-clamp-2">{item.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Address block (pickup or delivery) ────────────────────────────────────────
+function AddressBlock({
+  title, icon, colorClass, savedAddrs, onSaved,
+  addrValue, addrChange, phoneValue, phoneChange,
+  addrPlaceholder, phonePlaceholder,
+}: {
+  title: string; icon: React.ReactNode; colorClass: string; color?: string
+  savedAddrs: SavedAddr[]; onSaved: (a: string) => void
+  addrValue: string; addrChange: (v: string) => void
+  phoneValue: string; phoneChange: any
+  addrPlaceholder: string; phonePlaceholder: string
+}) {
+  const icons: Record<string, React.ReactNode> = { home: <Home size={11} />, work: <Briefcase size={11} /> }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className={`w-6 h-6 ${colorClass} rounded-full flex items-center justify-center`}>{icon}</div>
+          <h2 className="font-bold text-sm">{title}</h2>
+        </div>
+        {savedAddrs.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {savedAddrs.slice(0, 3).map(a => (
+              <button key={a.id} onClick={() => onSaved(a.address)}
+                className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-paper-100 rounded-lg text-xs text-paper-600 hover:text-paper-900 transition-colors">
+                {icons[a.type] || <MapPin size={11} />} {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="input-group">
+        <AddressSuggest
+          value={addrValue}
+          onChange={addrChange}
+          placeholder={addrPlaceholder}
+          icon={<MapPin size={16} className="text-paper-500" />}
+        />
+        <div className="flex items-center">
+          <Phone size={16} className="text-paper-500 ml-4 flex-shrink-0" />
+          <input className="input-field" placeholder={phonePlaceholder} type="tel"
+            value={phoneValue} onChange={phoneChange} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-paper-500 text-sm flex-shrink-0">{label}</span>
+      <span className="text-sm font-medium text-right">{value}</span>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function CreateOrder() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -35,6 +194,7 @@ export default function CreateOrder() {
   const [service]             = useState<ServiceType>((params.get('service') as ServiceType) || 'document')
   const [speed, setSpeed]     = useState<SpeedTier>('standard')
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [form, setForm] = useState({
     pickupAddress: '', pickupPhone: '', deliveryAddress: '', deliveryPhone: '', itemContent: '', itemNote: '',
   })
@@ -47,22 +207,35 @@ export default function CreateOrder() {
   const [savedAddrs, setSavedAddrs]     = useState<SavedAddr[]>([])
   const [estimate, setEstimate]         = useState<Estimate | null>(null)
   const [estimating, setEstimating]     = useState(false)
+  const [estimateError, setEstimateError] = useState('')
+  const [useVoucher, setUseVoucher]     = useState(false)
 
   useEffect(() => {
     api.get('/users/me/addresses').then(r => setSavedAddrs(r.data)).catch(() => {})
   }, [])
 
-  const fetchEstimate = useCallback(async (tier: SpeedTier, promo?: string | null) => {
+  const fetchEstimate = useCallback(async (tier: SpeedTier, promo?: string | null, pickup?: string, delivery?: string) => {
     setEstimating(true)
+    setEstimateError('')
     try {
-      const { data } = await api.post('/orders/estimate', { speed_tier: tier, promo_code: promo || undefined })
+      const { data } = await api.post('/orders/estimate', {
+        speed_tier: tier,
+        promo_code: promo || undefined,
+        pickup_address: pickup || undefined,
+        delivery_address: delivery || undefined,
+      })
       setEstimate(data)
-    } catch { /* ignore */ } finally { setEstimating(false) }
+    } catch (e: any) {
+      setEstimateError(e?.response?.data?.error || '費用計算失敗，請重試')
+    } finally { setEstimating(false) }
   }, [])
 
   useEffect(() => {
-    if (step === 'speed' || step === 'confirm') fetchEstimate(speed, promoApplied)
-  }, [step, speed, promoApplied, fetchEstimate])
+    if (step === 'speed' || step === 'confirm') fetchEstimate(speed, promoApplied, form.pickupAddress, form.deliveryAddress)
+  }, [step, speed, promoApplied, form.pickupAddress, form.deliveryAddress, fetchEstimate])
+
+  const setAddr = (field: 'pickupAddress' | 'deliveryAddress') => (v: string) =>
+    setForm(prev => ({ ...prev, [field]: v }))
 
   const handleChange = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }))
@@ -95,11 +268,12 @@ export default function CreateOrder() {
         item_note:        form.itemNote || undefined,
         speed_tier:       speed,
         promo_code:       promoApplied || undefined,
+        use_voucher:      useVoucher || undefined,
         scheduled_at:     isScheduled && scheduleTime ? new Date(scheduleTime).toISOString() : undefined,
       })
       navigate(`/tracking?id=${order.id}&new=1`)
     } catch (e: any) {
-      alert(e?.response?.data?.error || '下單失敗，請再試一次')
+      setSubmitError(e?.response?.data?.error || '下單失敗，請再試一次')
     } finally { setSubmitting(false) }
   }
 
@@ -123,7 +297,7 @@ export default function CreateOrder() {
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
           {(['info', 'speed', 'confirm'] as Step[]).map((s, i) => {
-            const done = (step === 'speed' && i === 0) || (step === 'confirm' && i < 2)
+            const done   = (step === 'speed' && i === 0) || (step === 'confirm' && i < 2)
             const active = step === s
             const labels = ['任務資訊', '選擇速度', '確認下單']
             return (
@@ -139,29 +313,28 @@ export default function CreateOrder() {
           })}
         </div>
 
-        {/* ── STEP 1 ── */}
+        {/* ── STEP 1: Info ── */}
         {step === 'info' && (
           <div className="animate-slide-up space-y-6">
-            {/* Pickup */}
             <AddressBlock
-              title="取件資訊" color="paper-900" colorClass="bg-white"
+              title="取件資訊" colorClass="bg-white"
               icon={<Navigation size={12} className="text-paper-900" />}
               savedAddrs={savedAddrs}
-              onSaved={a => setForm(p => ({ ...p, pickupAddress: a }))}
-              addrValue={form.pickupAddress} addrChange={handleChange('pickupAddress')}
-              phoneValue={form.pickupPhone} phoneChange={handleChange('pickupPhone')}
-              addrPlaceholder="取件地址" phonePlaceholder="取件聯絡電話"
+              onSaved={v => setForm(p => ({ ...p, pickupAddress: v }))}
+              addrValue={form.pickupAddress} addrChange={setAddr('pickupAddress')}
+              phoneValue={form.pickupPhone}  phoneChange={handleChange('pickupPhone')}
+              addrPlaceholder="取件地址（輸入後顯示建議）" phonePlaceholder="取件聯絡電話"
             />
-            {/* Delivery */}
             <AddressBlock
-              title="送達資訊" color="amber-600" colorClass="bg-amber-100"
+              title="送達資訊" colorClass="bg-amber-100"
               icon={<MapPin size={12} className="text-amber-600" />}
               savedAddrs={savedAddrs}
-              onSaved={a => setForm(p => ({ ...p, deliveryAddress: a }))}
-              addrValue={form.deliveryAddress} addrChange={handleChange('deliveryAddress')}
-              phoneValue={form.deliveryPhone} phoneChange={handleChange('deliveryPhone')}
-              addrPlaceholder="送達地址" phonePlaceholder="收件人電話"
+              onSaved={v => setForm(p => ({ ...p, deliveryAddress: v }))}
+              addrValue={form.deliveryAddress} addrChange={setAddr('deliveryAddress')}
+              phoneValue={form.deliveryPhone}  phoneChange={handleChange('deliveryPhone')}
+              addrPlaceholder="送達地址（輸入後顯示建議）" phonePlaceholder="收件人電話"
             />
+
             {/* Item */}
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -184,6 +357,7 @@ export default function CreateOrder() {
                 </div>
               </div>
             </div>
+
             {/* Schedule */}
             <div>
               <button onClick={() => setIsScheduled(!isScheduled)}
@@ -205,13 +379,14 @@ export default function CreateOrder() {
                 </div>
               )}
             </div>
+
             <button disabled={!canProceed} onClick={() => setStep('speed')} className="btn-primary w-full">
               下一步：選擇配送速度 <ChevronRight size={16} />
             </button>
           </div>
         )}
 
-        {/* ── STEP 2 ── */}
+        {/* ── STEP 2: Speed ── */}
         {step === 'speed' && (
           <div className="animate-slide-up space-y-4">
             <h2 className="font-bold mb-2">選擇配送速度</h2>
@@ -258,7 +433,7 @@ export default function CreateOrder() {
           </div>
         )}
 
-        {/* ── STEP 3 ── */}
+        {/* ── STEP 3: Confirm ── */}
         {step === 'confirm' && (
           <div className="animate-slide-up space-y-4">
             <h2 className="font-bold mb-2">確認訂單內容</h2>
@@ -267,11 +442,28 @@ export default function CreateOrder() {
               <Row label="配送速度" value={`${SPEED_OPTIONS.find(o => o.id === speed)!.label} · ${SPEED_OPTIONS.find(o => o.id === speed)!.timeRange}`} />
               {isScheduled && scheduleTime && <Row label="預約取件" value={new Date(scheduleTime).toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />}
               <div className="h-px bg-paper-100" />
-              <Row label="取件地址" value={form.pickupAddress} />
-              <Row label="取件電話" value={form.pickupPhone} />
-              <div className="h-px bg-paper-100" />
-              <Row label="送達地址" value={form.deliveryAddress} />
-              <Row label="收件電話" value={form.deliveryPhone} />
+              {/* Route summary */}
+              <div className="space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 flex-shrink-0 flex flex-col items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-600 ring-2 ring-green-100" />
+                    <div className="w-0.5 h-5 bg-gray-200" />
+                    <div className="w-2.5 h-2.5 rounded-sm bg-red-600 ring-2 ring-red-100" />
+                  </div>
+                  <div className="flex-1 space-y-2.5 min-w-0">
+                    <div>
+                      <div className="text-xs text-paper-400">取件地址</div>
+                      <div className="text-sm font-medium text-paper-900">{form.pickupAddress}</div>
+                      <div className="text-xs text-paper-400">{form.pickupPhone}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-paper-400">送達地址</div>
+                      <div className="text-sm font-medium text-paper-900">{form.deliveryAddress}</div>
+                      <div className="text-xs text-paper-400">{form.deliveryPhone}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="h-px bg-paper-100" />
               <Row label="物品內容" value={form.itemContent} />
               {form.itemNote && <Row label="備註" value={form.itemNote} />}
@@ -295,22 +487,52 @@ export default function CreateOrder() {
                     placeholder="輸入折扣碼" value={promoInput}
                     onChange={e => { setPromoInput(e.target.value); setPromoError('') }}
                     onKeyDown={e => e.key === 'Enter' && applyPromo()} />
-                  <button onClick={applyPromo} disabled={promoChecking} className="px-4 py-2.5 bg-white hover:bg-paper-100 border border-paper-200 rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+                  <button onClick={applyPromo} disabled={promoChecking}
+                    className="px-4 py-2.5 bg-white hover:bg-paper-100 border border-paper-200 rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
                     {promoChecking ? <Loader2 size={14} className="animate-spin" /> : '套用'}
                   </button>
                 </div>
               )}
               {promoError && <div className="text-red-400 text-xs mt-1.5">{promoError}</div>}
               <div className="text-paper-400 text-xs mt-2">試試看：UFLY50 / NEW100 / VIP200</div>
+
+              {/* Subscription discount badge */}
+              {estimate?.sub_discount && (
+                <div className="mt-2 flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                  <Star size={12} className="text-blue-600" />
+                  <span className="text-blue-700 text-xs font-medium">
+                    {estimate.subscription_tier === 'pro' ? 'Pro' : 'Enterprise'} 會員享基本費 {estimate.subscription_tier === 'pro' ? '8' : '7.5'} 折優惠
+                  </span>
+                </div>
+              )}
+              {/* Voucher toggle for pro/enterprise users */}
+              {(estimate?.subscription_tier === 'pro' || estimate?.subscription_tier === 'enterprise') && (estimate?.vouchers_left ?? 0) > 0 && (
+                <div className="mt-2 flex items-center justify-between bg-paper-50 border border-paper-200 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <Tag size={12} className="text-paper-600" />
+                    <span className="text-paper-700 text-xs">使用免速度費優惠券（剩 {estimate?.vouchers_left} 張）</span>
+                  </div>
+                  <button onClick={() => setUseVoucher(v => !v)}
+                    className={`w-9 h-5 rounded-full transition-colors ${useVoucher ? 'bg-paper-900' : 'bg-paper-300'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${useVoucher ? 'translate-x-4' : ''}`} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Fee */}
             <div className="card space-y-2">
               <div className="font-semibold mb-3 text-xs text-paper-500 uppercase tracking-wider">費用明細</div>
+              {estimateError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-600 text-xs">
+                  {estimateError}
+                  <button onClick={() => fetchEstimate(speed, promoApplied, form.pickupAddress, form.deliveryAddress)} className="ml-auto underline">重試</button>
+                </div>
+              )}
               {est ? (
                 <>
                   <Row label="基本費用" value={`NT$${est.base_fee}`} />
-                  <Row label={`${SPEED_OPTIONS.find(o=>o.id===speed)!.label}加價`} value={est.surcharge === 0 ? '免費' : `+NT$${est.surcharge}`} />
+                  <Row label={`${SPEED_OPTIONS.find(o => o.id === speed)!.label}加價`} value={est.surcharge === 0 || useVoucher ? '免費（優惠券）' : `+NT$${est.surcharge}`} />
                   {est.discount > 0 && <Row label={`折扣碼 ${promoApplied}`} value={`-NT$${est.discount}`} />}
                   <div className="h-px bg-paper-100 my-1" />
                   <div className="flex items-center justify-between">
@@ -327,60 +549,14 @@ export default function CreateOrder() {
               )}
             </div>
 
-            <button onClick={handleSubmit} disabled={submitting || !est} className="btn-primary w-full text-base py-4">
+            {submitError && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-2.5">{submitError}</div>}
+            {!est && !estimateError && !estimating && <div className="text-paper-400 text-xs text-center">請等待費用計算完成</div>}
+            <button onClick={() => { setSubmitError(''); handleSubmit() }} disabled={submitting || !est} className="btn-primary w-full text-base py-4 disabled:opacity-50">
               {submitting ? <><Loader2 size={16} className="animate-spin" /> 建立中…</> : <>確認下單 <ArrowRight size={16} /></>}
             </button>
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function AddressBlock({ title, icon, colorClass, savedAddrs, onSaved, addrValue, addrChange, phoneValue, phoneChange, addrPlaceholder, phonePlaceholder }: {
-  title: string; icon: React.ReactNode; colorClass: string; color?: string
-  savedAddrs: SavedAddr[]; onSaved: (a: string) => void
-  addrValue: string; addrChange: any; phoneValue: string; phoneChange: any
-  addrPlaceholder: string; phonePlaceholder: string
-}) {
-  const icons: Record<string, React.ReactNode> = { home: <Home size={11} />, work: <Briefcase size={11} /> }
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`w-6 h-6 ${colorClass} rounded-full flex items-center justify-center`}>{icon}</div>
-          <h2 className="font-bold text-sm">{title}</h2>
-        </div>
-        {savedAddrs.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap">
-            {savedAddrs.slice(0, 3).map(a => (
-              <button key={a.id} onClick={() => onSaved(a.address)}
-                className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-paper-100 rounded-lg text-xs text-paper-600 hover:text-paper-900 transition-colors">
-                {icons[a.type] || <MapPin size={11} />} {a.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="input-group">
-        <div className="flex items-center">
-          <MapPin size={16} className="text-paper-500 ml-4 flex-shrink-0" />
-          <input className="input-field" placeholder={addrPlaceholder} value={addrValue} onChange={addrChange} />
-        </div>
-        <div className="flex items-center">
-          <Phone size={16} className="text-paper-500 ml-4 flex-shrink-0" />
-          <input className="input-field" placeholder={phonePlaceholder} type="tel" value={phoneValue} onChange={phoneChange} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-paper-500 text-sm flex-shrink-0">{label}</span>
-      <span className="text-sm font-medium text-right">{value}</span>
     </div>
   )
 }

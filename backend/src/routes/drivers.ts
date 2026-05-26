@@ -93,7 +93,9 @@ router.patch('/orders/:id/status', requireDriver, async (req: AuthRequest, res) 
   })
 
   if (status === 'completed') {
-    await prisma.driver.update({ where: { id: req.user!.id }, data: { status: 'online', totalTrips: { increment: 1 } } })
+    // Only set online if driver was busy (not if they went offline mid-delivery)
+    await prisma.driver.updateMany({ where: { id: req.user!.id, status: 'busy' }, data: { status: 'online', totalTrips: { increment: 1 } } })
+    await prisma.driver.updateMany({ where: { id: req.user!.id, status: { not: 'busy' } }, data: { totalTrips: { increment: 1 } } })
     await prisma.user.update({ where: { id: order.userId }, data: { totalOrders: { increment: 1 } } })
   }
 

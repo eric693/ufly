@@ -1,9 +1,12 @@
+import { randomBytes } from 'crypto'
 import { Router } from 'express'
+import { Server } from 'socket.io'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { requireDriver, AuthRequest } from '../middleware/requireAuth'
 import prisma from '../lib/prisma'
+import { serializeOrder } from '../lib/serializer'
 
 const router = Router()
 
@@ -14,7 +17,7 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)
+    cb(null, `${randomBytes(16).toString('hex')}${ext}`)
   },
 })
 
@@ -39,7 +42,20 @@ router.post('/proof/:orderId', requireDriver, upload.single('photo'), async (req
   const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4010}`
   const photoUrl = `${baseUrl}/uploads/${req.file.filename}`
 
-  await prisma.order.update({ where: { id: order.id }, data: { photoUrl } })
+  const updated = await prisma.order.update({
+    where: { id: order.id },
+    data: { photoUrl },
+    include: { driver: true },
+  })
+
+  // Notify customer and admin that the proof photo is available
+  const io: Server | null = req.app.get('io')
+  if (io) {
+    const serialized = serializeOrder(updated)
+    io.to(`user:${order.userId}`).emit('order:update', serialized)
+    io.to('admin').emit('order:update', serialized)
+  }
+
   res.json({ ok: true, photo_url: photoUrl })
 })
 

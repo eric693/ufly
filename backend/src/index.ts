@@ -17,11 +17,13 @@ import driversRouter     from './routes/drivers'
 import uploadRouter      from './routes/upload'
 import paymentsRouter    from './routes/payments'
 import disputesRouter    from './routes/disputes'
-import webhooksRouter    from './routes/webhooks'
+import webhooksRouter       from './routes/webhooks'
+import subscriptionsRouter  from './routes/subscriptions'
 import { setupSocketIO } from './socket'
+import { randomUUID } from 'crypto'
 import prisma from './lib/prisma'
 import { serializeOrder } from './lib/serializer'
-import { calcNextRun } from './routes/orders'
+import { calcNextRun, nextOrderId, calcRecurringFare } from './routes/orders'
 
 const app    = express()
 const server = http.createServer(app)
@@ -82,7 +84,8 @@ app.use('/api/drivers',     driversRouter)
 app.use('/api/upload',      uploadRouter)
 app.use('/api/payments',    paymentsRouter)
 app.use('/api/disputes',    disputesRouter)
-app.use('/api/webhooks',    webhooksRouter)
+app.use('/api/webhooks',       webhooksRouter)
+app.use('/api/subscriptions', subscriptionsRouter)
 
 // Serve uploaded files
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
@@ -158,12 +161,12 @@ setInterval(async () => {
 
       await prisma.driver.update({ where: { id: chosen.id }, data: { status: 'busy' } })
       await prisma.notification.create({
-        data: { id: require('crypto').randomUUID(), userId: order.userId, type: 'info', title: '訂單已接單', body: `${order.id} — 已自動指派任務夥伴` },
+        data: { id: randomUUID(), userId: order.userId, type: 'info', title: '訂單已接單', body: `${order.id} — 已自動指派任務夥伴` },
       })
       const updated = await prisma.order.findUnique({ where: { id: order.id }, include: { driver: true } })
       if (updated) {
         io.to(`user:${order.userId}`).emit('order:update', serializeOrder(updated))
-        io.to(`driver:${chosen.id}`).emit('order:assigned', serializeOrder(updated))
+        io.to(`user:${chosen.id}`).emit('order:assigned', serializeOrder(updated))
       }
       console.log(`[auto-dispatch] Order ${order.id} → driver ${chosen.id}`)
     }
@@ -179,31 +182,61 @@ setInterval(async () => {
       where: { active: true, nextRun: { lte: new Date() } },
     })
     for (const rec of due) {
-      const last = await prisma.order.findFirst({ where: { id: { startsWith: 'UF' } }, orderBy: { id: 'desc' } })
-      const newId = last
-        ? 'UF' + String(parseInt(last.id.replace('UF', '')) + 1).padStart(6, '0')
-        : 'UF240001'
-
-      const order = await prisma.order.create({
-        data: {
-          id: newId, userId: rec.userId,
-          serviceType: rec.serviceType, status: 'matching',
-          pickupAddress: rec.pickupAddress, deliveryAddress: rec.deliveryAddress,
-          itemContent: rec.itemContent, speedTier: rec.speedTier,
-          baseFee: 120, surcharge: 0, discount: 0, totalFee: 120,
-          distance: 0, duration: 0, recurringId: rec.id,
-        },
-      })
-      await prisma.recurringOrder.update({
-        where: { id: rec.id },
-        data: { nextRun: calcNextRun(rec.schedule, new Date()) },
+      // Use a transaction so ID generation + order creation are atomic
+      const fare = await calcRecurringFare(rec.pickupAddress, rec.deliveryAddress, rec.speedTier, rec.userId)
+      const order = await prisma.$transaction(async (tx) => {
+        const newId = await nextOrderId(tx as typeof prisma)
+        const created = await tx.order.create({
+          data: {
+            id: newId, userId: rec.userId,
+            serviceType: rec.serviceType, status: 'matching',
+            pickupAddress: rec.pickupAddress, deliveryAddress: rec.deliveryAddress,
+            itemContent: rec.itemContent, speedTier: rec.speedTier,
+            baseFee: fare.base_fee, surcharge: fare.surcharge, discount: 0, totalFee: fare.total_fee,
+            distance: fare.distance, duration: fare.duration, recurringId: rec.id,
+          },
+        })
+        await tx.recurringOrder.update({
+          where: { id: rec.id },
+          data: { nextRun: calcNextRun(rec.schedule, new Date()) },
+        })
+        return created
       })
       io.to('drivers').emit('order:new', serializeOrder(order))
       io.to(`user:${rec.userId}`).emit('order:update', serializeOrder(order))
-      console.log(`[recurring] Spawned order ${newId} from template ${rec.id}`)
+      console.log(`[recurring] Spawned order ${order.id} from template ${rec.id}`)
     }
   } catch (e) { console.error('[recurring] Error:', e) }
 }, 60_000)
+
+// ── Monthly subscription renewal check: every hour ───────────────────────────
+setInterval(async () => {
+  try {
+    const now = new Date()
+    // Expire cancelled or lapsed subscriptions
+    const lapsed = await prisma.subscription.findMany({
+      where: { renewsAt: { lte: now }, cancelledAt: null },
+    })
+    for (const sub of lapsed) {
+      // Reset vouchers and push renewsAt forward one month
+      const nextRenew = new Date(sub.renewsAt)
+      nextRenew.setMonth(nextRenew.getMonth() + 1)
+      const vouchersLeft = sub.tier === 'pro' ? 3 : 999
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { renewsAt: nextRenew, vouchersLeft },
+      })
+    }
+    // Downgrade users whose subscription was cancelled
+    const cancelled = await prisma.subscription.findMany({
+      where: { cancelledAt: { lte: now } },
+      select: { userId: true },
+    })
+    for (const s of cancelled) {
+      await prisma.user.updateMany({ where: { id: s.userId, subscriptionTier: { not: 'free' } }, data: { subscriptionTier: 'free' } })
+    }
+  } catch (e) { console.error('[subscription-renew] Error:', e) }
+}, 60 * 60_000) // every 60 minutes
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001

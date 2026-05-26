@@ -12,23 +12,46 @@ import { triggerWebhooks } from '../lib/webhook'
 const router = Router()
 
 const SPEED_MINUTES: Record<string, number> = { standard: 75, express: 52, priority: 37, urgent: 20 }
-const FEE_PER_KM = 12
 
 function estimateDistance() { return Math.round((4 + Math.random() * 14) * 10) / 10 }
 
-function calcFare(distance: number, speedTier: string, discount = 0) {
-  const { baseFee, surcharges } = getFeeConfig()
-  const base      = baseFee + Math.round(distance * FEE_PER_KM)
-  const surcharge = (surcharges as Record<string, number>)[speedTier] ?? 0
-  const total     = Math.max(0, base + surcharge - discount)
-  const duration  = Math.round((SPEED_MINUTES[speedTier] ?? 75) * (0.8 + distance / 20))
-  return { base_fee: base, surcharge, discount, total_fee: total, duration }
+// Subscription discount rates applied to base fee
+const SUB_DISCOUNT: Record<string, number> = { free: 1.0, pro: 0.8, enterprise: 0.75 }
+
+function calcFare(
+  distance: number,
+  speedTier: string,
+  discount = 0,
+  subscriptionTier = 'free',
+  useVoucher = false,       // Pro: waive speed surcharge for one order
+) {
+  const { baseFee, feePerKm, surcharges } = getFeeConfig()
+  const subRate = SUB_DISCOUNT[subscriptionTier] ?? 1.0
+  const base    = Math.round((baseFee + Math.round(distance * feePerKm)) * subRate)
+  let surcharge = (surcharges as Record<string, number>)[speedTier] ?? 0
+  if (useVoucher && surcharge > 0) surcharge = 0   // voucher waives surcharge
+  const total   = Math.max(30, base + surcharge - discount)  // minimum NT$30
+  const duration = Math.round((SPEED_MINUTES[speedTier] ?? 75) * (0.8 + distance / 20))
+  return { base_fee: base, surcharge, discount, total_fee: total, duration, sub_discount: subRate < 1 }
 }
 
-async function nextOrderId() {
-  const last = await prisma.order.findFirst({ where: { id: { startsWith: 'UF' } }, orderBy: { id: 'desc' } })
+// Exported so index.ts recurring scheduler can reuse the same logic
+export async function nextOrderId(tx?: typeof prisma): Promise<string> {
+  const db = tx ?? prisma
+  const last = await db.order.findFirst({ where: { id: { startsWith: 'UF' } }, orderBy: { id: 'desc' } })
   if (!last) return 'UF240001'
   return 'UF' + String(parseInt(last.id.replace('UF', '')) + 1).padStart(6, '0')
+}
+
+// Exported for recurring scheduler — calculates real fare for a recurring template
+export async function calcRecurringFare(pickup: string, delivery: string, speedTier: string, userId: string) {
+  const [distance, user] = await Promise.all([
+    calcDistance(pickup, delivery),
+    prisma.user.findUnique({ where: { id: userId }, select: { subscriptionTier: true } }),
+  ])
+  const subTier = user?.subscriptionTier ?? 'free'
+  const fare = calcFare(distance, speedTier, 0, subTier, false)
+  return { ...fare, distance }
 }
 
 async function notify(userId: string, type: string, title: string, body: string) {
@@ -82,10 +105,22 @@ router.delete('/recurring/:id', requireAuth, async (req: AuthRequest, res) => {
 })
 
 router.post('/estimate', requireAuth, async (req: AuthRequest, res) => {
-  const { speed_tier = 'standard', promo_code } = req.body
-  const distance = estimateDistance()
+  const { speed_tier = 'standard', promo_code, pickup_address, delivery_address } = req.body
+  // Use real distance if both addresses provided, otherwise fallback
+  const distance = (pickup_address && delivery_address)
+    ? await calcDistance(pickup_address, delivery_address)
+    : estimateDistance()
   const discount = promo_code ? await peekPromo(promo_code) : 0
-  res.json({ distance, ...calcFare(distance, speed_tier, discount), valid_promo: discount > 0 })
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { subscriptionTier: true, subscription: { select: { vouchersLeft: true } } } })
+  const subTier = user?.subscriptionTier ?? 'free'
+  const fare = calcFare(distance, speed_tier, discount, subTier)
+  res.json({
+    distance,
+    ...fare,
+    valid_promo: discount > 0,
+    subscription_tier: subTier,
+    vouchers_left: user?.subscription?.vouchersLeft ?? 0,
+  })
 })
 
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
@@ -115,41 +150,58 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   // Atomic promo consume
   const promo = promo_code ? await consumePromo(promo_code) : { discount: 0, id: null }
 
-  // Fetch user meta (referral + enterpriseId) in one query
-  const userMeta = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { referralBy: true, enterpriseId: true } })
-
-  // Referral first-order discount (NT$50, only if user has never placed an order)
-  const userOrderCount = await prisma.order.count({ where: { userId: req.user!.id } })
-  const referralDiscount = (userOrderCount === 0 && !!userMeta?.referralBy) ? 50 : 0
-
-  const totalDiscount = promo.discount + referralDiscount
-  const fare = calcFare(distance, speed_tier, totalDiscount)
-  const id = await nextOrderId()
-  const initialStatus = scheduled_at ? 'pending' : 'matching'
-
-  const order = await prisma.order.create({
-    data: {
-      id, userId: req.user!.id,
-      enterpriseId: userMeta?.enterpriseId ?? null,
-      serviceType: service_type || 'delivery',
-      status: initialStatus,
-      pickupAddress: pickup_address, pickupPhone: pickup_phone || null,
-      deliveryAddress: delivery_address, deliveryPhone: delivery_phone || null,
-      itemContent: item_content || null, itemNote: item_note || null,
-      speedTier: speed_tier,
-      baseFee: fare.base_fee, surcharge: fare.surcharge, discount: fare.discount, totalFee: fare.total_fee,
-      distance, duration: fare.duration,
-      scheduledAt: scheduled_at ? new Date(scheduled_at) : null,
-    },
-    include: { driver: true },
+  // Fetch user meta (referral, enterpriseId, subscription tier + vouchers)
+  const userMeta = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { referralBy: true, enterpriseId: true, subscriptionTier: true, subscription: { select: { id: true, vouchersLeft: true } } },
   })
 
-  await notify(req.user!.id, 'info', '訂單已建立', `${id} — 正在媒合任務夥伴`)
+  // Use a voucher if client requested it and the user has Pro/Enterprise with vouchers left
+  const useVoucher = !!(req.body.use_voucher && userMeta?.subscription && (userMeta.subscription.vouchersLeft ?? 0) > 0)
+
+  const subTier = userMeta?.subscriptionTier ?? 'free'
+  const initialStatus = scheduled_at ? 'pending' : 'matching'
+
+  // Wrap ID generation + creation in a transaction to prevent duplicate IDs under concurrency
+  // Also check referral discount inside tx to avoid race condition on first order
+  const order = await prisma.$transaction(async (tx) => {
+    const userOrderCount = await tx.order.count({ where: { userId: req.user!.id } })
+    const referralDiscount = (userOrderCount === 0 && !!userMeta?.referralBy) ? 50 : 0
+    const totalDiscount = promo.discount + referralDiscount
+    const fare = calcFare(distance, speed_tier, totalDiscount, subTier, useVoucher)
+
+    const id = await nextOrderId(tx as typeof prisma)
+    const created = await tx.order.create({
+      data: {
+        id, userId: req.user!.id,
+        enterpriseId: userMeta?.enterpriseId ?? null,
+        serviceType: service_type || 'delivery',
+        status: initialStatus,
+        pickupAddress: pickup_address, pickupPhone: pickup_phone || null,
+        deliveryAddress: delivery_address, deliveryPhone: delivery_phone || null,
+        itemContent: item_content || null, itemNote: item_note || null,
+        speedTier: speed_tier,
+        baseFee: fare.base_fee, surcharge: fare.surcharge, discount: fare.discount, totalFee: fare.total_fee,
+        distance, duration: fare.duration,
+        scheduledAt: scheduled_at ? new Date(scheduled_at) : null,
+      },
+      include: { driver: true },
+    })
+    if (useVoucher && userMeta?.subscription?.id) {
+      await tx.subscription.update({
+        where: { id: userMeta.subscription.id },
+        data: { vouchersLeft: { decrement: 1 } },
+      })
+    }
+    return created
+  })
+
+  await notify(req.user!.id, 'info', '訂單已建立', `${order.id} — 正在媒合任務夥伴`)
 
   // Email confirmation (non-blocking)
   prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true } }).then(u => {
-    if (u?.email) sendEmail(u.email, `【Ufly】訂單已建立 ${id}`, orderStatusEmail(id, 'accepted')).catch(() => {})
-  }).catch(() => {})
+    if (u?.email) sendEmail(u.email, `【Ufly】訂單已建立 ${order.id}`, orderStatusEmail(order.id, 'accepted')).catch(e => console.error('[order-email]', e))
+  }).catch(e => console.error('[order-email-fetch]', e))
 
   const io: Server | null = req.app.get('io')
   if (io) {
@@ -177,9 +229,21 @@ router.put('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
   const order = await prisma.order.findFirst({ where: { id: req.params.id, userId: req.user!.id } })
   if (!order) { res.status(404).json({ error: 'Not found' }); return }
   if (!['pending', 'matching'].includes(order.status)) { res.status(400).json({ error: '無法取消此狀態訂單' }); return }
-  const updated = await prisma.order.update({ where: { id: req.params.id }, data: { status: 'cancelled' } })
+  const updated = await prisma.order.update({
+    where: { id: req.params.id },
+    data: { status: 'cancelled' },
+    include: { driver: true },
+  })
   const io: Server | null = req.app.get('io')
-  if (io) io.to(`user:${req.user!.id}`).emit('order:update', { ...flatOrder(updated) })
+  if (io) {
+    const serialized = flatOrder(updated)
+    io.to(`user:${req.user!.id}`).emit('order:update', serialized)
+    // Notify the assigned driver (if any) that the order was cancelled
+    if (order.driverId) {
+      io.to(`user:${order.driverId}`).emit('order:update', serialized)
+    }
+    io.to('admin').emit('order:update', serialized)
+  }
   res.json({ ok: true })
 })
 

@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto'
 import { Router } from 'express'
+import { Server } from 'socket.io'
 import { v4 as uuidv4 } from 'uuid'
 import prisma from '../lib/prisma'
 import { requireAdmin, AuthRequest } from '../middleware/requireAuth'
@@ -7,6 +9,17 @@ import { sendLineMessage } from '../lib/lineMessaging'
 import { readSettings, writeSettings } from '../lib/settings'
 import { sendEmail, orderStatusEmail } from '../lib/email'
 import { auditLog } from '../lib/audit'
+
+// Admin may force any forward transition; backward jumps are blocked to prevent corruption
+const VALID_ADMIN_TRANSITIONS: Record<string, string[]> = {
+  pending:    ['matching', 'cancelled'],
+  matching:   ['accepted', 'cancelled'],
+  accepted:   ['pickup', 'cancelled'],
+  pickup:     ['delivering', 'cancelled'],
+  delivering: ['completed', 'cancelled'],
+  completed:  [],
+  cancelled:  [],
+}
 
 const router = Router()
 
@@ -23,7 +36,7 @@ router.get('/stats', requireAdmin, async (_req, res) => {
     prisma.order.aggregate({ where: { status: 'completed', duration: { gt: 0 } }, _avg: { duration: true } }),
   ])
 
-  const completionRate = totalClosed > 0 ? Math.round((totalCompleted / totalClosed) * 1000) / 10 : 100
+  const completionRate = totalClosed > 0 ? Math.round((totalCompleted / totalClosed) * 1000) / 10 : null
   const avgDeliveryTime = Math.round(avgDurationAgg._avg.duration ?? 0)
   res.json({ todayOrders, todayRevenue: todayRevenueAgg._sum.totalFee ?? 0, activeDrivers, pendingOrders, completionRate, avgDeliveryTime })
 })
@@ -48,15 +61,36 @@ router.get('/orders', requireAdmin, async (req, res) => {
 
 router.put('/orders/:id/status', requireAdmin, async (req: AuthRequest, res) => {
   const { status, driver_id } = req.body
-  const valid = ['pending', 'matching', 'accepted', 'pickup', 'delivering', 'completed', 'cancelled']
+  const valid = Object.keys(VALID_ADMIN_TRANSITIONS)
   if (!valid.includes(status)) { res.status(400).json({ error: 'Invalid status' }); return }
-  const exists = await prisma.order.findUnique({ where: { id: req.params.id }, select: { id: true } })
-  if (!exists) { res.status(404).json({ error: '訂單不存在' }); return }
+
+  const current = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: { driver: true },
+  })
+  if (!current) { res.status(404).json({ error: '訂單不存在' }); return }
+
+  const allowed = VALID_ADMIN_TRANSITIONS[current.status] ?? []
+  if (!allowed.includes(status)) {
+    res.status(400).json({ error: `無法從 ${current.status} 強制轉換為 ${status}` }); return
+  }
+
   const order = await prisma.order.update({
     where: { id: req.params.id },
     data: { status, ...(driver_id ? { driverId: driver_id } : {}) },
+    include: { driver: true },
   })
   auditLog('order:status', req, req.params.id, status, req.user?.id)
+
+  // Emit real-time update to customer, driver, and admin
+  const io: Server | null = req.app.get('io')
+  if (io) {
+    const serialized = serializeOrder(order)
+    if (order.userId) io.to(`user:${order.userId}`).emit('order:update', serialized)
+    if (order.driverId) io.to(`user:${order.driverId}`).emit('order:update', serialized)
+    io.to('admin').emit('order:update', serialized)
+  }
+
   if (order.userId) {
     const msgs: Record<string, string> = { accepted: '已接單', pickup: '取件中', delivering: '配送中', completed: '已送達', cancelled: '已取消' }
     if (msgs[status]) {
@@ -207,7 +241,7 @@ router.post('/promos', requireAdmin, async (req, res) => {
   if (!code || !discount) { res.status(400).json({ error: '請填寫優惠碼與折扣金額' }); return }
   try {
     const promo = await prisma.promoCode.create({
-      data: { id: require('crypto').randomUUID(), code: code.toUpperCase(), discount: Number(discount), usageMax: usage_max ? Number(usage_max) : null },
+      data: { id: randomUUID(), code: code.toUpperCase(), discount: Number(discount), usageMax: usage_max ? Number(usage_max) : null },
     })
     res.json(promo)
   } catch { res.status(400).json({ error: '優惠碼已存在' }) }
@@ -251,21 +285,33 @@ router.get('/drivers/:id/earnings', requireAdmin, async (req, res) => {
 })
 
 router.get('/settings', requireAdmin, (_req, res) => {
-  res.json(readSettings())
+  const s = readSettings()
+  // Mask secrets — frontend only needs to know if they're set, not the values
+  res.json({
+    ...s,
+    ecpayHashKey: s.ecpayHashKey ? '••••••••' : '',
+    ecpayHashIv:  s.ecpayHashIv  ? '••••••••' : '',
+    smtpPass:     s.smtpPass     ? '••••••••' : '',
+  })
 })
 
 const ALLOWED_SETTING_KEYS = new Set([
-  'platformName','serviceArea','baseFee','expressSurcharge','prioritySurcharge',
+  'platformName','serviceArea','baseFee','feePerKm','expressSurcharge','prioritySurcharge',
   'urgentSurcharge','notifyNewOrder','notifyDriverMatch','notifyOrderComplete',
   'maxOrderDistance','autoMatchRadius',
   'ecpayMerchantId','ecpayHashKey','ecpayHashIv','ecpayStage',
   'smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom',
 ])
 
+const MASKED_VALUE = '••••••••'
+const MASKED_KEYS = new Set(['ecpayHashKey', 'ecpayHashIv', 'smtpPass'])
+
 router.put('/settings', requireAdmin, (req: AuthRequest, res) => {
   try {
     const safe = Object.fromEntries(
-      Object.entries(req.body).filter(([k]) => ALLOWED_SETTING_KEYS.has(k))
+      Object.entries(req.body)
+        .filter(([k]) => ALLOWED_SETTING_KEYS.has(k))
+        .filter(([k, v]) => !(MASKED_KEYS.has(k) && v === MASKED_VALUE)) // skip placeholder masks
     )
     auditLog('settings:update', req, undefined, JSON.stringify(safe), req.user?.id)
     res.json(writeSettings(safe))

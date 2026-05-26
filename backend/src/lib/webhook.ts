@@ -32,20 +32,18 @@ export async function triggerWebhooks(
         },
         timeout: 10_000,
       })
-      .then((r: { status: number; data: unknown }) =>
-        prisma.webhookDelivery.update({
+      .then((r: { status: number; data: unknown }) => {
+        const raw = JSON.stringify(r.data)
+        if (raw.length > 1000) console.warn(`[webhook] Response from ${ep.url} truncated (${raw.length} chars)`)
+        return prisma.webhookDelivery.update({
           where: { id: delivery.id },
-          data: {
-            statusCode: r.status,
-            response: JSON.stringify(r.data).slice(0, 500),
-            deliveredAt: new Date(),
-          },
-        }),
-      )
+          data: { statusCode: r.status, response: raw.slice(0, 1000), deliveredAt: new Date() },
+        })
+      })
       .catch((e: { response?: { status?: number }; message: string }) =>
         prisma.webhookDelivery.update({
           where: { id: delivery.id },
-          data: { statusCode: e.response?.status ?? 0, response: e.message.slice(0, 500) },
+          data: { statusCode: e.response?.status ?? 0, response: e.message.slice(0, 1000) },
         }),
       )
   }

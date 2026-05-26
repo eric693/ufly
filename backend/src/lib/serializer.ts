@@ -63,8 +63,9 @@ export function serializeUser(u: any) {
     rating:        u.rating,
     total_orders:  u.totalOrders,
     referral_code: u.referralCode,
-    enterprise_id: u.enterpriseId,
-    created_at:    u.createdAt,
+    enterprise_id:      u.enterpriseId,
+    subscription_tier:  u.subscriptionTier ?? 'free',
+    created_at:         u.createdAt,
   }
 }
 

@@ -53,13 +53,19 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 })
 
 // Admin: list all disputes
-router.get('/admin/all', requireAdmin, async (_req, res) => {
+router.get('/admin/all', requireAdmin, async (req, res) => {
+  const limit  = Math.min(Math.max(1, parseInt(req.query.limit  as string) || 50), 200)
+  const offset = Math.max(0, parseInt(req.query.offset as string) || 0)
+  const { status } = req.query as Record<string, string>
   const disputes = await prisma.dispute.findMany({
+    where: status ? { status } : {},
     include: {
       order: { select: { id: true, pickupAddress: true, deliveryAddress: true, totalFee: true } },
       user:  { select: { name: true, email: true, phone: true } },
     },
     orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip: offset,
   })
   res.json(disputes)
 })
