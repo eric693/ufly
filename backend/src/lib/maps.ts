@@ -2,8 +2,8 @@ import axios from 'axios'
 
 export interface Coord { lat: number; lng: number }
 
-// ── Caches (process-lifetime, keyed by address string) ─────────────────────────
-const geocodeCache = new Map<string, Coord | null>()
+// ── Caches (process-lifetime; only successful lookups cached so nulls retry) ────
+const geocodeCache = new Map<string, Coord>()
 
 const MAPBOX_TOKEN = () => process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN || ''
 const GOOGLE_KEY   = () => process.env.GOOGLE_MAPS_API_KEY || ''
@@ -41,7 +41,7 @@ export async function geocode(address: string): Promise<Coord | null> {
   if (!address) return null
   if (geocodeCache.has(address)) return geocodeCache.get(address)!
   const coord = (await mapboxGeocode(address)) ?? (await nominatimGeocode(address))
-  geocodeCache.set(address, coord)
+  if (coord) geocodeCache.set(address, coord)
   return coord
 }
 

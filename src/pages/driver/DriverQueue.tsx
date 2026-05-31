@@ -132,7 +132,7 @@ function IncomingOrderSheet({
 
         {/* Actions */}
         <div className="px-5 pb-5 flex gap-3">
-          <button onClick={onSkip} disabled={accepting}
+          <button onClick={onSkip} disabled={accepting} aria-label="略過"
             className="w-14 flex items-center justify-center rounded-2xl border border-white/15 text-white/60 active:bg-white/10 disabled:opacity-40">
             <X size={20} />
           </button>
@@ -156,7 +156,6 @@ export default function DriverQueue() {
   const [driverPos, setDriverPos]     = useState<[number, number] | null>(null)
   const [refreshing, setRefreshing]   = useState(false)
   const geoWatchRef = useRef<number | null>(null)
-  const incomingQueueRef = useRef<any[]>([])
 
   // Keep the screen awake while online so GPS keeps flowing
   useWakeLock(online)
@@ -181,15 +180,16 @@ export default function DriverQueue() {
     }
   }, [])
 
-  const showNextIncoming = useCallback(() => {
-    const next = incomingQueueRef.current.shift()
-    setIncomingOrder(next ?? null)
+  // Drop an order from the queue (skipped / taken / failed) — the surface effect
+  // below then offers the next available order, so a skipped order never repops.
+  const dismissOrder = useCallback((id: string) => {
+    setOrders(prev => prev.filter(o => o.id !== id))
+    setIncomingOrder((cur: any) => (cur && cur.id === id ? null : cur))
   }, [])
 
   const handleSkip = useCallback(() => {
-    setIncomingOrder(null)
-    setTimeout(showNextIncoming, 300)
-  }, [showNextIncoming])
+    setIncomingOrder((cur: any) => { if (cur) setOrders(prev => prev.filter(o => o.id !== cur.id)); return null })
+  }, [])
 
   const handleAccept = useCallback(async () => {
     if (!incomingOrder || accepting) return
@@ -199,12 +199,11 @@ export default function DriverQueue() {
       navigate(`/driver/order/${incomingOrder.id}`)
     } catch {
       alert('接單失敗，可能已被他人接走')
-      setOrders(prev => prev.filter(o => o.id !== incomingOrder.id))
-      handleSkip()
+      dismissOrder(incomingOrder.id)
     } finally {
       setAccepting(false)
     }
-  }, [incomingOrder, accepting, navigate, handleSkip])
+  }, [incomingOrder, accepting, navigate, dismissOrder])
 
   // Socket + queue fetch
   useEffect(() => {
@@ -212,24 +211,14 @@ export default function DriverQueue() {
     api.get('/drivers/me/queue').then(r => setOrders(r.data)).catch(() => {})
 
     const socket = getSocket()
+    // New order broadcast → add to the queue (surface effect shows it if idle)
     const handler = (order: any) => {
-      setOrders(prev => [order, ...prev.filter(o => o.id !== order.id)])
-      setIncomingOrder((current: any) => {
-        if (!current) { return order }
-        incomingQueueRef.current.push(order)
-        return current
-      })
+      setOrders(prev => prev.some(o => o.id === order.id) ? prev : [...prev, order])
     }
     // Another driver (or the fallback dispatcher) took this order → drop it
-    const takenHandler = ({ id }: { id: string }) => {
-      incomingQueueRef.current = incomingQueueRef.current.filter(o => o.id !== id)
-      setOrders(prev => prev.filter(o => o.id !== id))
-      setIncomingOrder((cur: any) => (cur && cur.id === id ? (incomingQueueRef.current.shift() ?? null) : cur))
-    }
+    const takenHandler = ({ id }: { id: string }) => dismissOrder(id)
     // The fallback dispatcher assigned this order to me → go straight to the task
-    const assignedHandler = (order: any) => {
-      navigate(`/driver/order/${order.id}`)
-    }
+    const assignedHandler = (order: any) => { navigate(`/driver/order/${order.id}`) }
     socket.on('order:new', handler)
     socket.on('order:taken', takenHandler)
     socket.on('order:assigned', assignedHandler)
@@ -238,7 +227,7 @@ export default function DriverQueue() {
       socket.off('order:taken', takenHandler)
       socket.off('order:assigned', assignedHandler)
     }
-  }, [online, navigate])
+  }, [online, navigate, dismissOrder])
 
   const toggleOnline = async () => {
     const next = !online
@@ -247,7 +236,6 @@ export default function DriverQueue() {
     if (!next) {
       setOrders([])
       setIncomingOrder(null)
-      incomingQueueRef.current = []
     }
   }
 

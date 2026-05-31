@@ -22,12 +22,12 @@ export const mapTile = TOKEN
       maxZoom: 19,
     }
 
-// ── Geocoding (cached) ──────────────────────────────────────────────────────────
-const geocodeCache: Record<string, LatLng | null> = {}
+// ── Geocoding (successful lookups cached; nulls retry) ─────────────────────────
+const geocodeCache: Record<string, LatLng> = {}
 
 export async function geocode(address: string): Promise<LatLng | null> {
   if (!address) return null
-  if (address in geocodeCache) return geocodeCache[address]
+  if (geocodeCache[address]) return geocodeCache[address]
   let coord: LatLng | null = null
   if (TOKEN) {
     try {
@@ -50,7 +50,7 @@ export async function geocode(address: string): Promise<LatLng | null> {
       if (d[0]) coord = [parseFloat(d[0].lat), parseFloat(d[0].lon)]
     } catch { /* fall through */ }
   }
-  geocodeCache[address] = coord
+  if (coord) geocodeCache[address] = coord
   return coord
 }
 
@@ -80,7 +80,8 @@ export async function geocodeSuggest(q: string): Promise<AddressSuggestion[]> {
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=tw&accept-language=zh-TW`,
     )
-    return await r.json()
+    const d = await r.json()
+    return Array.isArray(d) ? d : []
   } catch { return [] }
 }
 
