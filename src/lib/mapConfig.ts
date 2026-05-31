@@ -3,7 +3,9 @@
 
 export type LatLng = [number, number]
 
-const TOKEN: string = ((import.meta as any).env?.VITE_MAPBOX_TOKEN as string) || ''
+// NOTE: must be the exact `import.meta.env.VITE_MAPBOX_TOKEN` form (no optional
+// chaining / cast) so Vite statically replaces it at build time.
+const TOKEN: string = import.meta.env.VITE_MAPBOX_TOKEN || ''
 export const hasMapbox = !!TOKEN
 export const MAPBOX_TOKEN = TOKEN
 
