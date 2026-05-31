@@ -1,26 +1,11 @@
-// Shared helpers for the driver app (geocoding, distance, routing, navigation)
+// Shared helpers for the driver app. Geocoding + routing go through the central
+// map provider (Mapbox when VITE_MAPBOX_TOKEN is set, OSM/OSRM fallback).
+import { geocode as providerGeocode, routeWithEta, type LatLng } from '../../lib/mapConfig'
 
-export type LatLng = [number, number]
+export type { LatLng }
 
-// ── Geocode (Nominatim), cached ───────────────────────────────────────────────
-const geocodeCache: Record<string, LatLng> = {}
-export async function geocode(address: string): Promise<LatLng | null> {
-  if (!address) return null
-  if (geocodeCache[address]) return geocodeCache[address]
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'zh-TW' } },
-    )
-    const data = await res.json()
-    if (data[0]) {
-      const coord: LatLng = [parseFloat(data[0].lat), parseFloat(data[0].lon)]
-      geocodeCache[address] = coord
-      return coord
-    }
-  } catch {}
-  return null
-}
+// Re-export the provider geocode so existing imports keep working
+export const geocode = providerGeocode
 
 // ── Straight-line distance in km ──────────────────────────────────────────────
 export function haversineKm(a: LatLng, b: LatLng): number {
@@ -48,24 +33,15 @@ export function advanceLabel(amount?: number): string {
   return amount && amount > 0 ? `$${amount}` : '無需代墊'
 }
 
-// ── Driving route via OSRM (public demo server) ───────────────────────────────
-// Returns the road-following polyline as [lat,lng][] (empty on failure).
+// ── Driving route polyline as [lat,lng][] (empty on failure) ──────────────────
 export async function fetchRoute(waypoints: LatLng[]): Promise<LatLng[]> {
   const pts = waypoints.filter(Boolean)
   if (pts.length < 2) return []
-  const coords = pts.map(([lat, lng]) => `${lng},${lat}`).join(';')
-  try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`,
-    )
-    const data = await res.json()
-    const line = data?.routes?.[0]?.geometry?.coordinates
-    if (Array.isArray(line)) return line.map((c: number[]) => [c[1], c[0]] as LatLng)
-  } catch {}
-  return []
+  const r = await routeWithEta(pts[0], pts[pts.length - 1])
+  return r?.coords ?? []
 }
 
-// ── Open external turn-by-turn navigation ─────────────────────────────────────
+// ── Open external turn-by-turn navigation (Google Maps deep-link) ─────────────
 export function openNavigation(address: string, pos: LatLng | null) {
   const dest = pos ? `${pos[0]},${pos[1]}` : encodeURIComponent(address || '')
   if (!dest) return

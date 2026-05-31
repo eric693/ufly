@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Navigation, Package, RefreshCw } from 'lucide-react'
 import api from '../../lib/api'
+import { mapTile } from '../../lib/mapConfig'
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -64,7 +65,7 @@ export default function LiveMap() {
       <div className="grid md:grid-cols-3 gap-4">
         <div className="md:col-span-2 rounded-2xl overflow-hidden border border-surface-700">
           <MapContainer center={[25.0330, 121.5654]} zoom={12} style={{height:560,width:'100%'}}>
-            <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <TileLayer {...mapTile} />
             {drivers.map(d => (
               <Marker key={d.id} position={[d.lat, d.lng]}
                 icon={mkIcon(d.status === 'online' ? '#22c55e' : '#eab308')}

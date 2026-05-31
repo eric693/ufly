@@ -9,6 +9,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
 import { getSocket } from '../lib/socket'
+import { mapTile, geocode, routeWithEta } from '../lib/mapConfig'
 import type { OrderStatus } from '../types'
 
 // ── Leaflet setup ─────────────────────────────────────────────────────────────
@@ -76,45 +77,9 @@ interface Order {
   driver_id?: string
   created_at: string; rated: number; item_content: string
   photo_url?: string
+  pickup_lat?: number; pickup_lng?: number; delivery_lat?: number; delivery_lng?: number
 }
 interface DriverPos { driverId: string; lat: number; lng: number }
-
-// ── Geocode (Nominatim, cached) ───────────────────────────────────────────────
-const geocodeCache: Record<string, [number, number]> = {}
-async function geocode(address: string): Promise<[number, number] | null> {
-  if (geocodeCache[address]) return geocodeCache[address]
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=tw`,
-      { headers: { 'Accept-Language': 'zh-TW' } },
-    )
-    const data = await res.json()
-    if (data[0]) {
-      const coord: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)]
-      geocodeCache[address] = coord
-      return coord
-    }
-  } catch {}
-  return null
-}
-
-// ── OSRM route ────────────────────────────────────────────────────────────────
-async function fetchRoute(
-  from: [number, number],
-  to: [number, number],
-): Promise<{ coords: [number, number][]; durationSec: number } | null> {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
-    const res = await fetch(url)
-    const json = await res.json()
-    if (json.code !== 'Ok') return null
-    const route = json.routes[0]
-    const coords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: number[]) => [lat, lng])
-    return { coords, durationSec: Math.round(route.duration) }
-  } catch {
-    return null
-  }
-}
 
 // ── Map auto-fit ──────────────────────────────────────────────────────────────
 function MapFit({ positions }: { positions: [number, number][] }) {
@@ -148,16 +113,18 @@ function LiveTrackingMap({
   const [route2, setRoute2]           = useState<[number, number][]>([])  // pickup → delivery
   const [eta, setEta]                 = useState<number | null>(null)      // seconds
 
-  // Geocode addresses
+  // Resolve coords — prefer server-stored coords, else geocode
   useEffect(() => {
-    geocode(order.pickup_address).then(p => p && setPickupPos(p))
-    geocode(order.delivery_address).then(p => p && setDeliveryPos(p))
-  }, [order.pickup_address, order.delivery_address])
+    if (order.pickup_lat != null && order.pickup_lng != null) setPickupPos([order.pickup_lat, order.pickup_lng])
+    else geocode(order.pickup_address).then(p => p && setPickupPos(p))
+    if (order.delivery_lat != null && order.delivery_lng != null) setDeliveryPos([order.delivery_lat, order.delivery_lng])
+    else geocode(order.delivery_address).then(p => p && setDeliveryPos(p))
+  }, [order.pickup_address, order.delivery_address, order.pickup_lat, order.delivery_lat])
 
   // Fetch pickup→delivery route once
   useEffect(() => {
     if (!pickupPos || !deliveryPos) return
-    fetchRoute(pickupPos, deliveryPos).then(r => { if (r) setRoute2(r.coords) })
+    routeWithEta(pickupPos, deliveryPos).then(r => { if (r) setRoute2(r.coords) })
   }, [pickupPos, deliveryPos])
 
   // Fetch driver→next route + ETA whenever driver moves
@@ -172,7 +139,7 @@ function LiveTrackingMap({
     if (now - lastRouteReqRef.current < 15000) return  // throttle: at most once per 15s
     lastRouteReqRef.current = now
 
-    fetchRoute(dPos, dest).then(r => {
+    routeWithEta(dPos, dest).then(r => {
       if (r) {
         setRoute1(r.coords)
         setEta(r.durationSec)
@@ -219,7 +186,7 @@ function LiveTrackingMap({
           zoomControl={false}
           attributionControl={false}
           style={{ height: '100%', width: '100%' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer {...mapTile} />
           <MapFit positions={mapPositions} />
 
           {/* Routes */}

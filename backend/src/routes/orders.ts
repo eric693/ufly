@@ -5,7 +5,7 @@ import prisma from '../lib/prisma'
 import { requireAuth, AuthRequest } from '../middleware/requireAuth'
 import { serializeOrder, serializeRecurring } from '../lib/serializer'
 import { getFeeConfig } from '../lib/settings'
-import { calcDistance } from '../lib/maps'
+import { calcDistance, geocode } from '../lib/maps'
 import { sendEmail, orderStatusEmail } from '../lib/email'
 import { triggerWebhooks } from '../lib/webhook'
 
@@ -146,6 +146,11 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   if (scheduled_at && new Date(scheduled_at) <= new Date()) { res.status(400).json({ error: '排程時間必須在未來' }); return }
 
   const distance = await calcDistance(pickup_address, delivery_address)
+  // Geocode once on the server so the map markers + nearest-driver dispatch have coords
+  const [pickupCoord, deliveryCoord] = await Promise.all([
+    geocode(pickup_address),
+    geocode(delivery_address),
+  ])
 
   // Atomic promo consume
   const promo = promo_code ? await consumePromo(promo_code) : { discount: 0, id: null }
@@ -184,6 +189,8 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
         baseFee: fare.base_fee, surcharge: fare.surcharge, discount: fare.discount, totalFee: fare.total_fee,
         advanceAmount: Math.max(0, Math.round(Number(advance_amount) || 0)),
         distance, duration: fare.duration,
+        pickupLat: pickupCoord?.lat ?? null, pickupLng: pickupCoord?.lng ?? null,
+        deliveryLat: deliveryCoord?.lat ?? null, deliveryLng: deliveryCoord?.lng ?? null,
         scheduledAt: scheduled_at ? new Date(scheduled_at) : null,
       },
       include: { driver: true },

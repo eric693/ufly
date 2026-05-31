@@ -7,6 +7,8 @@ import { Phone, MessageSquare, Camera, Loader2, ChevronLeft, Navigation, Menu } 
 import api from '../../lib/api'
 import { getSocket } from '../../lib/socket'
 import { geocode, haversineKm, etaMinutes, distLabel, advanceLabel, fetchRoute, openNavigation, LatLng } from './driverUtils'
+import { mapTile } from '../../lib/mapConfig'
+import { useWakeLock } from '../../hooks/useWakeLock'
 
 // ── Leaflet icons ────────────────────────────────────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -103,6 +105,9 @@ export default function DriverOrderDetail() {
   const [routeLine, setRouteLine]     = useState<LatLng[]>([])
   const [distToNext, setDistToNext]   = useState<number | null>(null)
 
+  // Keep screen awake while a delivery is active so GPS keeps flowing
+  useWakeLock(!!order && !['completed', 'cancelled'].includes(order.status))
+
   useEffect(() => {
     api.get('/drivers/me/current')
       .then(r => {
@@ -124,11 +129,13 @@ export default function DriverOrderDetail() {
     return () => { socket.off('order:update', handler) }
   }, [id])
 
-  // Geocode addresses
+  // Resolve pickup/delivery coords — prefer server-stored coords, else geocode
   useEffect(() => {
     if (!order) return
-    if (order.pickup_address)   geocode(order.pickup_address).then(p => p && setPickupPos(p))
-    if (order.delivery_address) geocode(order.delivery_address).then(p => p && setDeliveryPos(p))
+    if (order.pickup_lat != null && order.pickup_lng != null) setPickupPos([order.pickup_lat, order.pickup_lng])
+    else if (order.pickup_address) geocode(order.pickup_address).then(p => p && setPickupPos(p))
+    if (order.delivery_lat != null && order.delivery_lng != null) setDeliveryPos([order.delivery_lat, order.delivery_lng])
+    else if (order.delivery_address) geocode(order.delivery_address).then(p => p && setDeliveryPos(p))
   }, [order?.id])
 
   // GPS broadcast + update driver position
@@ -228,7 +235,7 @@ export default function DriverOrderDetail() {
           zoomControl={false}
           style={{ height: '100%', width: '100%' }}
           attributionControl={false}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
+          <TileLayer {...mapTile} />
           <MapFit positions={mapPositions} />
           {routeLine.length > 1 && (
             <Polyline positions={routeLine} pathOptions={{ color: '#22c55e', weight: 6, opacity: 0.9 }} />

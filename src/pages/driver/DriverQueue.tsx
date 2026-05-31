@@ -9,6 +9,8 @@ import {
 import api from '../../lib/api'
 import { getSocket } from '../../lib/socket'
 import { geocode, haversineKm, etaMinutes, advanceLabel } from './driverUtils'
+import { mapTile } from '../../lib/mapConfig'
+import { useWakeLock } from '../../hooks/useWakeLock'
 
 // ── Leaflet icons ────────────────────────────────────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -81,10 +83,15 @@ function IncomingOrderSheet({
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [order.id])
 
-  // Distance driver → pickup
+  // Distance driver → pickup (prefer server-stored coords, else geocode)
   useEffect(() => {
     let alive = true
-    if (!driverPos || !order.pickup_address) { setPickupDist(null); return }
+    if (!driverPos) { setPickupDist(null); return }
+    if (order.pickup_lat != null && order.pickup_lng != null) {
+      setPickupDist(haversineKm(driverPos, [order.pickup_lat, order.pickup_lng]))
+      return
+    }
+    if (!order.pickup_address) { setPickupDist(null); return }
     geocode(order.pickup_address).then(p => {
       if (alive && p) setPickupDist(haversineKm(driverPos, p))
     })
@@ -150,6 +157,9 @@ export default function DriverQueue() {
   const [refreshing, setRefreshing]   = useState(false)
   const geoWatchRef = useRef<number | null>(null)
   const incomingQueueRef = useRef<any[]>([])
+
+  // Keep the screen awake while online so GPS keeps flowing
+  useWakeLock(online)
 
   // If a delivery is already in progress (e.g. page reload), resume it
   useEffect(() => {
@@ -269,7 +279,7 @@ export default function DriverQueue() {
           zoomControl={false}
           attributionControl={false}
           style={{ height: '100%', width: '100%' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer {...mapTile} />
           {driverPos && (
             <Marker position={driverPos} icon={driverIcon}>
               <Popup>您的位置</Popup>

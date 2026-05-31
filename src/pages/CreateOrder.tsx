@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { SpeedTier, ServiceType } from '../types'
 import api from '../lib/api'
+import { geocodeSuggest } from '../lib/mapConfig'
 
 const SERVICE_LABELS: Record<string, string> = {
   document: '文件急送', delivery: '物品配送', purchase: '即時代購',
@@ -66,11 +67,8 @@ function AddressSuggest({
   const search = useCallback((q: string) => {
     if (q.trim().length < 3) { setResults([]); setOpen(false); return }
     setLoading(true)
-    fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=tw&accept-language=zh-TW`,
-    )
-      .then(r => r.json())
-      .then((data: NominatimResult[]) => {
+    geocodeSuggest(q)
+      .then(data => {
         setResults(data)
         setOpen(data.length > 0)
       })

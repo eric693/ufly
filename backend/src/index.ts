@@ -151,14 +151,14 @@ setInterval(async () => {
       })
       if (drivers.length === 0) continue
 
-      // Pick driver with lat/lng closest to Taipei centre (rough heuristic when pickup coords unknown)
-      const TAIPEI_LAT = 25.033, TAIPEI_LNG = 121.565
-      drivers.sort((a, b) => {
-        const da = Math.hypot(a.lat - TAIPEI_LAT, a.lng - TAIPEI_LNG)
-        const db = Math.hypot(b.lat - TAIPEI_LAT, b.lng - TAIPEI_LNG)
-        return da - db
-      })
-      const chosen = drivers[0]
+      // Pick the online driver nearest to the order's pickup point (real proximity).
+      // Falls back to first driver only if the pickup was never geocoded.
+      let chosen = drivers[0]
+      if (order.pickupLat != null && order.pickupLng != null) {
+        const sq = (d: { lat: number; lng: number }) =>
+          (d.lat - order.pickupLat!) ** 2 + (d.lng - order.pickupLng!) ** 2
+        chosen = drivers.reduce((best, d) => (sq(d) < sq(best) ? d : best), drivers[0])
+      }
 
       const result = await prisma.order.updateMany({
         where: { id: order.id, status: 'matching' },
