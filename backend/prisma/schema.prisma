@@ -91,6 +91,7 @@ model Order {
   surcharge       Int       @default(0)
   discount        Int       @default(0)
   totalFee        Int       @default(120) @map("total_fee")
+  advanceAmount   Int       @default(0) @map("advance_amount")
   distance        Float     @default(0)
   duration        Int       @default(0)
   scheduledAt     DateTime? @map("scheduled_at")

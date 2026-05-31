@@ -19,6 +19,7 @@ export function serializeOrder(order: any) {
     surcharge:        o.surcharge,
     discount:         o.discount,
     total_fee:        o.totalFee,
+    advance_amount:   o.advanceAmount ?? 0,
     distance:         o.distance,
     duration:         o.duration,
     scheduled_at:     o.scheduledAt,

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Phone, Camera, Loader2, ChevronLeft, Navigation } from 'lucide-react'
+import { Phone, MessageSquare, Camera, Loader2, ChevronLeft, Navigation, Menu } from 'lucide-react'
 import api from '../../lib/api'
 import { getSocket } from '../../lib/socket'
+import { geocode, haversineKm, etaMinutes, distLabel, advanceLabel, fetchRoute, openNavigation, LatLng } from './driverUtils'
 
 // ── Leaflet icons ────────────────────────────────────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -27,119 +28,58 @@ const driverIcon = L.divIcon({
   iconSize: [18, 18],
 })
 
-// ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_LABELS: Record<string, string> = {
-  accepted:   '前往取件中',
-  pickup:     '已抵達取件地點',
-  delivering: '配送中',
-  completed:  '已完成配送',
-}
-const NEXT_ACTION: Record<string, { label: string; next: string }> = {
-  accepted:   { label: '出發取件', next: 'pickup' },
-  pickup:     { label: '確認已取件，開始配送', next: 'delivering' },
-  delivering: { label: '確認已送達', next: 'completed' },
-}
-const STATUS_DEST: Record<string, 'pickup' | 'delivery'> = {
-  accepted:   'pickup',
-  pickup:     'pickup',
-  delivering: 'delivery',
-}
-
-// ── Geocode helper (Nominatim) ────────────────────────────────────────────────
-const geocodeCache: Record<string, [number, number]> = {}
-async function geocode(address: string): Promise<[number, number] | null> {
-  if (geocodeCache[address]) return geocodeCache[address]
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'zh-TW' } },
-    )
-    const data = await res.json()
-    if (data[0]) {
-      const coord: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)]
-      geocodeCache[address] = coord
-      return coord
-    }
-  } catch {}
-  return null
+// ── Per-status flow config ─────────────────────────────────────────────────────
+type DestKey = 'pickup' | 'delivery'
+const FLOW: Record<string, {
+  title: string; destKey: DestKey; navLabel: string; actionLabel: string; next: string
+}> = {
+  accepted:   { title: '任務已接受', destKey: 'pickup',   navLabel: '導航到取件地', actionLabel: '我已到達取件點', next: 'pickup' },
+  pickup:     { title: '前往取件',   destKey: 'pickup',   navLabel: '導航到取件地', actionLabel: '確認取件並出發', next: 'delivering' },
+  delivering: { title: '前往送達',   destKey: 'delivery', navLabel: '導航到送達地', actionLabel: '我已到達送達點', next: 'completed' },
 }
 
 // ── Map auto-fit helper ───────────────────────────────────────────────────────
-function MapFit({ positions }: { positions: [number, number][] }) {
+function MapFit({ positions }: { positions: LatLng[] }) {
   const map = useMap()
   useEffect(() => {
     if (positions.length === 0) return
     if (positions.length === 1) { map.setView(positions[0], 15); return }
-    const bounds = L.latLngBounds(positions)
-    map.fitBounds(bounds, { padding: [60, 60] })
+    map.fitBounds(L.latLngBounds(positions), { padding: [70, 70] })
   }, [JSON.stringify(positions)])
   return null
 }
 
-// ── Slide-to-confirm component ───────────────────────────────────────────────
-function SlideConfirm({ label, onConfirm, disabled }: { label: string; onConfirm: () => void; disabled: boolean }) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const [dragging, setDragging] = useState(false)
-  const [x, setX] = useState(0)
-  const startX = useRef(0)
-  const confirmed = useRef(false)
-
-  const THUMB = 56
-  const getMax = () => (trackRef.current?.clientWidth ?? 280) - THUMB - 8
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (disabled) return
-    confirmed.current = false
-    setDragging(true)
-    startX.current = e.clientX - x
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-  }
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return
-    const nx = Math.max(0, Math.min(e.clientX - startX.current, getMax()))
-    setX(nx)
-    if (nx >= getMax() - 4 && !confirmed.current) {
-      confirmed.current = true
-      setDragging(false)
-      onConfirm()
-    }
-  }
-  const onPointerUp = () => {
-    if (!confirmed.current) setX(0)
-    setDragging(false)
-  }
-
-  useEffect(() => { if (!disabled) { setX(0); confirmed.current = false } }, [disabled])
-
+// ── Stat cell ─────────────────────────────────────────────────────────────────
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div ref={trackRef}
-      className="relative w-full rounded-2xl overflow-hidden select-none"
-      style={{ background: '#1a1a1a', height: THUMB + 8 }}>
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className="text-white/50 text-sm font-semibold tracking-wide">{label}</span>
+    <div className="flex-1 px-3 py-2.5">
+      <div className="text-[11px] text-white/45 font-medium mb-1">{label}</div>
+      <div className={`font-black leading-none text-lg ${accent ? 'text-yellow-400' : 'text-white'}`}>{value}</div>
+    </div>
+  )
+}
+
+// ── Route row ─────────────────────────────────────────────────────────────────
+function RouteStop({
+  dotColor, label, address, phone,
+}: { dotColor: string; label: string; address: string; phone?: string }) {
+  return (
+    <div className="flex items-center gap-3 bg-white/[0.06] rounded-2xl px-4 py-3.5">
+      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] text-white/45 font-medium">{label}</div>
+        <div className="text-[15px] font-bold text-white truncate">{address}</div>
       </div>
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        style={{
-          position: 'absolute',
-          top: 4,
-          left: 4 + x,
-          width: THUMB,
-          height: THUMB,
-          background: '#fff',
-          borderRadius: 14,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: disabled ? 'not-allowed' : 'grab',
-          transition: dragging ? 'none' : 'left .25s ease',
-          boxShadow: '0 2px 8px rgba(0,0,0,.3)',
-          touchAction: 'none',
-        }}>
-        <ChevronLeft size={20} style={{ transform: 'rotate(180deg)', color: '#1a1a1a' }} />
-      </div>
+      {phone && (
+        <div className="flex gap-2 flex-shrink-0">
+          <a href={`tel:${phone}`} className="w-9 h-9 rounded-xl border border-white/15 flex items-center justify-center text-white/70 active:bg-white/10">
+            <Phone size={15} />
+          </a>
+          <a href={`sms:${phone}`} className="w-9 h-9 rounded-xl border border-white/15 flex items-center justify-center text-white/70 active:bg-white/10">
+            <MessageSquare size={15} />
+          </a>
+        </div>
+      )}
     </div>
   )
 }
@@ -157,13 +97,11 @@ export default function DriverOrderDetail() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Map positions
-  const [driverPos, setDriverPos]     = useState<[number, number] | null>(null)
-  const [pickupPos, setPickupPos]     = useState<[number, number] | null>(null)
-  const [deliveryPos, setDeliveryPos] = useState<[number, number] | null>(null)
-
-  // Distance display
-  const [distToNext, setDistToNext] = useState<string | null>(null)
+  const [driverPos, setDriverPos]     = useState<LatLng | null>(null)
+  const [pickupPos, setPickupPos]     = useState<LatLng | null>(null)
+  const [deliveryPos, setDeliveryPos] = useState<LatLng | null>(null)
+  const [routeLine, setRouteLine]     = useState<LatLng[]>([])
+  const [distToNext, setDistToNext]   = useState<number | null>(null)
 
   useEffect(() => {
     api.get('/drivers/me/current')
@@ -179,32 +117,28 @@ export default function DriverOrderDetail() {
     const socket = getSocket()
     const handler = (updated: any) => {
       if (updated.id !== id) return
-      if (updated.status === 'cancelled') {
-        // Customer cancelled — go back to queue
-        navigate('/driver', { replace: true })
-        return
-      }
+      if (updated.status === 'cancelled') { navigate('/driver', { replace: true }); return }
       setOrder(updated)
     }
     socket.on('order:update', handler)
     return () => { socket.off('order:update', handler) }
   }, [id])
 
-  // Geocode addresses when order loads
+  // Geocode addresses
   useEffect(() => {
     if (!order) return
-    if (order.pickup_address)  geocode(order.pickup_address).then(p => p && setPickupPos(p))
+    if (order.pickup_address)   geocode(order.pickup_address).then(p => p && setPickupPos(p))
     if (order.delivery_address) geocode(order.delivery_address).then(p => p && setDeliveryPos(p))
   }, [order?.id])
 
-  // GPS broadcast + update driver position on map
+  // GPS broadcast + update driver position
   useEffect(() => {
     if (!order || ['completed', 'cancelled'].includes(order.status)) return
     if (!navigator.geolocation) return
     const socket = getSocket()
     const watchId = navigator.geolocation.watchPosition(
       pos => {
-        const coord: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+        const coord: LatLng = [pos.coords.latitude, pos.coords.longitude]
         setDriverPos(coord)
         socket.emit('driver:location', { lat: coord[0], lng: coord[1] })
       },
@@ -214,29 +148,31 @@ export default function DriverOrderDetail() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [order?.status])
 
-  // Compute straight-line distance to next waypoint
+  const flow = order ? FLOW[order.status] : undefined
+  const destPos = flow ? (flow.destKey === 'pickup' ? pickupPos : deliveryPos) : null
+
+  // Distance to current waypoint
   useEffect(() => {
-    if (!driverPos) { setDistToNext(null); return }
-    if (!order) return
-    const dest = STATUS_DEST[order.status] === 'pickup' ? pickupPos : deliveryPos
-    if (!dest) { setDistToNext(null); return }
-    const R = 6371
-    const dLat = ((dest[0] - driverPos[0]) * Math.PI) / 180
-    const dLng = ((dest[1] - driverPos[1]) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((driverPos[0] * Math.PI) / 180) *
-        Math.cos((dest[0] * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2
-    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    setDistToNext(km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`)
-  }, [driverPos, pickupPos, deliveryPos, order?.status])
+    if (!driverPos || !destPos) { setDistToNext(null); return }
+    setDistToNext(haversineKm(driverPos, destPos))
+  }, [driverPos, destPos])
+
+  // Road-following route to current waypoint (green line)
+  useEffect(() => {
+    let alive = true
+    if (!driverPos || !destPos) { setRouteLine([]); return }
+    fetchRoute([driverPos, destPos]).then(line => {
+      if (!alive) return
+      setRouteLine(line.length ? line : [driverPos, destPos])
+    })
+    return () => { alive = false }
+  }, [driverPos, destPos])
 
   const updateStatus = useCallback(async () => {
-    if (!order || !NEXT_ACTION[order.status] || updating) return
+    if (!order || !FLOW[order.status] || updating) return
     setUpdating(true)
     try {
-      const { data } = await api.patch(`/drivers/orders/${order.id}/status`, { status: NEXT_ACTION[order.status].next })
+      const { data } = await api.patch(`/drivers/orders/${order.id}/status`, { status: FLOW[order.status].next })
       setOrder(data)
       if (data.status === 'completed') setTimeout(() => navigate('/driver'), 2000)
     } catch (e: any) {
@@ -245,7 +181,7 @@ export default function DriverOrderDetail() {
     } finally {
       setUpdating(false)
     }
-  }, [order, updating])
+  }, [order, updating, navigate])
 
   const uploadPhoto = async (file: File) => {
     if (!order) return
@@ -259,28 +195,30 @@ export default function DriverOrderDetail() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={28} className="animate-spin text-paper-400" />
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <Loader2 size={28} className="animate-spin text-white/40" />
     </div>
   )
-
   if (!order) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-paper-500">無進行中訂單</p>
-      <button onClick={() => navigate('/driver')} className="btn-primary">返回接單列表</button>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-black">
+      <p className="text-white/50">無進行中訂單</p>
+      <button onClick={() => navigate('/driver')} className="bg-yellow-400 text-black font-bold rounded-2xl px-5 py-3">返回接單列表</button>
     </div>
   )
 
-  const mapPositions: [number, number][] = [
+  const mapPositions: LatLng[] = [
     ...(driverPos ? [driverPos] : []),
     ...(pickupPos ? [pickupPos] : []),
     ...(deliveryPos ? [deliveryPos] : []),
   ]
-  const defaultCenter: [number, number] = driverPos ?? pickupPos ?? [25.0330, 121.5654]
-  const destPos = STATUS_DEST[order.status] === 'pickup' ? pickupPos : deliveryPos
+  const defaultCenter: LatLng = driverPos ?? pickupPos ?? [24.1477, 120.6736]
+  const isDone = order.status === 'completed'
+  const distLbl = distToNext != null ? distLabel(distToNext) : (order.distance ? `${order.distance} km` : '—')
+  const etaLbl  = distToNext != null ? `${etaMinutes(distToNext)} 分` : `${order.duration || '—'} 分`
+  const distStatLabel = flow?.destKey === 'delivery' ? '距離送達地' : '距離取件地'
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gray-100">
+    <div className="relative w-full h-screen overflow-hidden bg-black">
 
       {/* ── Full-screen Map ── */}
       <div className="absolute inset-0">
@@ -290,23 +228,19 @@ export default function DriverOrderDetail() {
           zoomControl={false}
           style={{ height: '100%', width: '100%' }}
           attributionControl={false}>
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution=""
-          />
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
           <MapFit positions={mapPositions} />
-          {driverPos && (
-            <Marker position={driverPos} icon={driverIcon}>
-              <Popup>您的位置</Popup>
-            </Marker>
+          {routeLine.length > 1 && (
+            <Polyline positions={routeLine} pathOptions={{ color: '#22c55e', weight: 6, opacity: 0.9 }} />
           )}
+          {driverPos && <Marker position={driverPos} icon={driverIcon}><Popup>您的位置</Popup></Marker>}
           {pickupPos && (
-            <Marker position={pickupPos} icon={mkDivIcon('#16a34a', '取件')}>
+            <Marker position={pickupPos} icon={mkDivIcon('#22c55e', '取件')}>
               <Popup>{order.pickup_address}</Popup>
             </Marker>
           )}
           {deliveryPos && (
-            <Marker position={deliveryPos} icon={mkDivIcon('#dc2626', '送達')}>
+            <Marker position={deliveryPos} icon={mkDivIcon('#3b82f6', '送達')}>
               <Popup>{order.delivery_address}</Popup>
             </Marker>
           )}
@@ -315,113 +249,56 @@ export default function DriverOrderDetail() {
 
       {/* ── Top Bar ── */}
       <div className="absolute top-0 left-0 right-0 z-[1000]">
-        <div className="flex items-start justify-between p-4 pt-8">
-          <button
-            onClick={() => navigate('/driver')}
+        <div className="flex items-center justify-between p-4 pt-8">
+          <button onClick={() => navigate('/driver')}
             className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
             <ChevronLeft size={20} className="text-gray-900" />
           </button>
-          {destPos && driverPos && distToNext && (
+          {distToNext != null && !isDone && (
             <div className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
               <Navigation size={13} className="inline mr-1.5 -mt-0.5" />
-              {distToNext}
+              {distLbl}
             </div>
           )}
         </div>
-
-        {/* Status banner */}
-        <div className="mx-4 mt-1 bg-gray-900/90 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-md">
-          <div className="text-white font-bold text-base">{STATUS_LABELS[order.status] ?? order.status}</div>
-          {order.status === 'accepted' || order.status === 'pickup' ? (
-            <div className="text-white/60 text-xs mt-0.5 truncate">{order.pickup_address}</div>
-          ) : order.status === 'delivering' ? (
-            <div className="text-white/60 text-xs mt-0.5 truncate">{order.delivery_address}</div>
-          ) : null}
-        </div>
       </div>
 
-      {/* ── Bottom Sheet ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,.12)]">
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />
+      {/* ── Bottom sheet ── */}
+      <div className="absolute bottom-0 left-0 right-0 z-[1000] px-3 pb-[68px]">
+        <div className="rounded-3xl shadow-2xl overflow-hidden" style={{ background: '#1c1c1e' }}>
 
-        <div className="px-5 pb-8 space-y-4">
-
-          {/* Fee & order ID */}
-          <div className="flex items-center justify-between">
+          {/* Header */}
+          <div className="flex items-start justify-between px-5 pt-5 pb-3">
             <div>
-              <div className="text-3xl font-black text-gray-900">NT${order.total_fee}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{order.id}</div>
+              <div className="text-xl font-black text-white">{flow?.title ?? (isDone ? '配送完成' : order.status)}</div>
+              <div className="text-[13px] text-white/40 mt-1">訂單：{order.id}</div>
             </div>
-            <div className="flex gap-3">
-              {order.pickup_phone && (
-                <a href={`tel:${order.pickup_phone}`}
-                  className="w-11 h-11 bg-gray-100 rounded-2xl flex items-center justify-center">
-                  <Phone size={18} className="text-gray-700" />
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Route */}
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex-shrink-0 flex flex-col items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-green-600 border-2 border-white ring-2 ring-green-600" />
-                <div className="w-0.5 h-6 bg-gray-200" />
-                <div className="w-3 h-3 rounded-sm bg-red-600 border-2 border-white ring-2 ring-red-600" />
-              </div>
-              <div className="flex-1 space-y-3">
-                <div>
-                  <div className="text-xs text-gray-400 font-medium">取件地點</div>
-                  <div className="text-sm font-semibold text-gray-900 leading-snug">{order.pickup_address}</div>
-                  {order.pickup_phone && (
-                    <a href={`tel:${order.pickup_phone}`} className="text-xs text-blue-600 flex items-center gap-1 mt-0.5">
-                      <Phone size={11} />{order.pickup_phone}
-                    </a>
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400 font-medium">送達地點</div>
-                  <div className="text-sm font-semibold text-gray-900 leading-snug">{order.delivery_address}</div>
-                  {order.delivery_phone && (
-                    <a href={`tel:${order.delivery_phone}`} className="text-xs text-blue-600 flex items-center gap-1 mt-0.5">
-                      <Phone size={11} />{order.delivery_phone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
+            <div className="text-2xl font-black text-green-400">${order.total_fee}</div>
           </div>
 
           {/* Stats */}
-          <div className="flex gap-3 text-sm text-gray-500">
-            {order.duration && (
-              <span className="flex items-center gap-1 bg-gray-50 rounded-xl px-3 py-1.5 font-medium">
-                {order.duration} 分鐘
-              </span>
-            )}
-            {order.distance && (
-              <span className="flex items-center gap-1 bg-gray-50 rounded-xl px-3 py-1.5 font-medium">
-                {order.distance} km
-              </span>
-            )}
-            {distToNext && (
-              <span className="flex items-center gap-1 bg-green-50 text-green-700 rounded-xl px-3 py-1.5 font-medium">
-                導航 {distToNext}
-              </span>
-            )}
+          <div className="mx-5 mb-4 flex rounded-2xl bg-white/[0.06] divide-x divide-white/10">
+            <Stat label={distStatLabel} value={distLbl} />
+            <Stat label="預估到達" value={etaLbl} />
+            <Stat label="代墊金額" value={advanceLabel(order.advance_amount)} accent={order.advance_amount > 0} />
           </div>
 
-          {/* Photo upload */}
+          {/* Route */}
+          <div className="mx-5 mb-4 space-y-2.5">
+            <RouteStop dotColor="#22c55e" label="取件地點" address={order.pickup_address} phone={order.pickup_phone} />
+            <RouteStop dotColor="#3b82f6" label="送達地點" address={order.delivery_address} phone={order.delivery_phone} />
+          </div>
+
+          {/* Proof photo (during delivering) */}
           {order.status === 'delivering' && (
-            <div>
+            <div className="mx-5 mb-4">
               <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
                 onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
               {photoUrl || order.photo_url ? (
                 <img src={photoUrl || order.photo_url} alt="送達照片" className="w-full rounded-2xl max-h-40 object-cover" />
               ) : (
                 <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-2xl py-3 text-gray-400 hover:border-gray-300 transition-colors text-sm">
+                  className="w-full flex items-center justify-center gap-2 border border-dashed border-white/20 rounded-2xl py-3 text-white/50 active:bg-white/5 text-sm">
                   {uploading ? <Loader2 size={15} className="animate-spin" /> : <Camera size={15} />}
                   {uploading ? '上傳中' : '拍攝送達照片（選填）'}
                 </button>
@@ -429,25 +306,41 @@ export default function DriverOrderDetail() {
             </div>
           )}
 
-          {/* Action */}
           {updateError && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-2.5">{updateError}</div>
-          )}
-          {NEXT_ACTION[order.status] && (
-            <SlideConfirm
-              label={`滑動${NEXT_ACTION[order.status].label}`}
-              onConfirm={updateStatus}
-              disabled={updating}
-            />
+            <div className="mx-5 mb-3 bg-red-500/15 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2.5">{updateError}</div>
           )}
 
-          {order.status === 'completed' && (
-            <div className="text-center py-4">
-              <div className="text-xl font-black text-gray-900">配送完成</div>
-              <p className="text-gray-400 text-sm mt-1">即將返回接單頁面</p>
-            </div>
-          )}
+          {/* Actions */}
+          <div className="px-5 pb-5">
+            {flow ? (
+              <div className="flex gap-3">
+                <button onClick={() => openNavigation(flow.destKey === 'pickup' ? order.pickup_address : order.delivery_address, destPos)}
+                  className="flex-1 rounded-2xl py-4 font-bold text-[15px] text-white bg-blue-600 active:bg-blue-500 transition-colors flex items-center justify-center gap-2">
+                  <Navigation size={16} />{flow.navLabel}
+                </button>
+                <button onClick={updateStatus} disabled={updating}
+                  className="flex-1 rounded-2xl py-4 font-black text-[15px] text-black bg-yellow-400 active:bg-yellow-300 transition-colors disabled:opacity-60">
+                  {updating ? '處理中…' : flow.actionLabel}
+                </button>
+              </div>
+            ) : isDone ? (
+              <div className="text-center py-3">
+                <div className="text-xl font-black text-white">配送完成 🎉</div>
+                <p className="text-white/40 text-sm mt-1">即將返回接單頁面</p>
+              </div>
+            ) : null}
+          </div>
         </div>
+      </div>
+
+      {/* ── Bottom status bar ── */}
+      <div className="absolute bottom-0 left-0 right-0 z-[1100] bg-black px-5 py-4 flex items-center justify-center">
+        <span className="text-white font-bold text-[15px]">配送進行中</span>
+        <button onClick={() => navigate('/driver/earnings')}
+          className="absolute right-4 flex flex-col items-center gap-0.5 text-white/70">
+          <Menu size={20} />
+          <span className="text-[10px] font-medium">選單</span>
+        </button>
       </div>
     </div>
   )

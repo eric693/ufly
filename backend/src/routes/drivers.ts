@@ -70,6 +70,8 @@ router.patch('/orders/:id/accept', requireDriver, async (req: AuthRequest, res) 
   if (io) {
     io.to(`user:${updated.userId}`).emit('order:update', flatOrder(updated))
     io.to('admin').emit('order:update', flatOrder(updated))
+    // Tell every other online driver this order is gone, so it leaves their queue
+    io.to('drivers').emit('order:taken', { id: updated.id })
   }
 
   await notifyUser(updated.userId, 'info', '已接單', `夥伴 ${updated.driver?.name || ''} 正在前往取件`, updated.id)

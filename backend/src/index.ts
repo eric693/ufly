@@ -131,11 +131,18 @@ setInterval(async () => {
   }
 }, 60_000)
 
-// ── Auto-dispatch: assign nearest online driver to matching orders ─────────────
+// ── Auto-dispatch fallback: if no driver accepts the broadcast within the grace
+//    window, auto-assign an online driver so the order never stalls. Drivers get
+//    first chance to tap-accept (Uber-Eats style); this is only the safety net. ──
+const DISPATCH_GRACE_MS = 45_000
 setInterval(async () => {
   try {
     const matching = await prisma.order.findMany({
-      where: { status: 'matching', driverId: null },
+      where: {
+        status: 'matching',
+        driverId: null,
+        createdAt: { lte: new Date(Date.now() - DISPATCH_GRACE_MS) },
+      },
     })
     for (const order of matching) {
       const drivers = await prisma.driver.findMany({
@@ -167,6 +174,8 @@ setInterval(async () => {
       if (updated) {
         io.to(`user:${order.userId}`).emit('order:update', serializeOrder(updated))
         io.to(`user:${chosen.id}`).emit('order:assigned', serializeOrder(updated))
+        // Remove from every other driver's queue
+        io.to('drivers').emit('order:taken', { id: order.id })
       }
       console.log(`[auto-dispatch] Order ${order.id} → driver ${chosen.id}`)
     }

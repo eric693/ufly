@@ -138,7 +138,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 })
 
 router.post('/', requireAuth, async (req: AuthRequest, res) => {
-  const { service_type, pickup_address, pickup_phone, delivery_address, delivery_phone, item_content, item_note, speed_tier = 'standard', promo_code, scheduled_at } = req.body
+  const { service_type, pickup_address, pickup_phone, delivery_address, delivery_phone, item_content, item_note, speed_tier = 'standard', promo_code, scheduled_at, advance_amount } = req.body
   if (!pickup_address || !delivery_address) { res.status(400).json({ error: '請填寫地址' }); return }
   if (typeof pickup_address !== 'string' || pickup_address.length > 300) { res.status(400).json({ error: '取件地址過長' }); return }
   if (typeof delivery_address !== 'string' || delivery_address.length > 300) { res.status(400).json({ error: '送達地址過長' }); return }
@@ -182,6 +182,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
         itemContent: item_content || null, itemNote: item_note || null,
         speedTier: speed_tier,
         baseFee: fare.base_fee, surcharge: fare.surcharge, discount: fare.discount, totalFee: fare.total_fee,
+        advanceAmount: Math.max(0, Math.round(Number(advance_amount) || 0)),
         distance, duration: fare.duration,
         scheduledAt: scheduled_at ? new Date(scheduled_at) : null,
       },
